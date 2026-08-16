@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bultum Behavior Portal · 2026–2027</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --ink:#16262b;
+  --ink-soft:#3f5257;
+  --muted:#7b8c90;
+  --line:#e2e8e7;
+  --line-strong:#cdd8d6;
+  --paper:#f1f5f4;
+  --surface:#ffffff;
+  --teal:#0d7d6e;
+  --teal-dark:#0a5f54;
+  --teal-tint:#e3f2ef;
+  --amber:#e2952a;
+  --amber-tint:#fbeecf;
+  --green:#16a34a;
+  --yellow:#e0b013;
+  --orange:#e8721c;
+  --red:#d6392f;
+  --green-tint:#e4f4ea;
+  --yellow-tint:#fbf3d3;
+  --orange-tint:#fce6d5;
+  --red-tint:#fbe0de;
+  --radius:14px;
+  --radius-sm:9px;
+  --shadow:0 1px 2px rgba(22,38,43,.05), 0 8px 24px -12px rgba(22,38,43,.18);
+  --shadow-lg:0 20px 50px -24px rgba(22,38,43,.4);
+  --disp:"Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --body:"Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--body);
+  color:var(--ink);
+  background:var(--paper);
+  font-size:15px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{font-family:var(--disp);margin:0;letter-spacing:-.01em}
+button{font-family:var(--body);cursor:pointer}
+a{color:var(--teal-dark)}
+input,select,textarea{font-family:var(--body);font-size:15px}
+
+/* ---------- App shell ---------- */
+.app{display:grid;grid-template-columns:248px 1fr;min-height:100vh}
+.sidebar{
+  background:var(--ink);
+  color:#cfe0dd;
+  padding:20px 14px;
+  position:sticky;top:0;height:100vh;
+  display:flex;flex-direction:column;gap:6px;
+  overflow-y:auto;
+}
+.brand{display:flex;gap:11px;align-items:center;padding:6px 8px 16px;margin-bottom:6px;border-bottom:1px solid rgba(255,255,255,.09)}
+.brand .mark{
+  width:38px;height:38px;border-radius:10px;flex:0 0 auto;
+  background:linear-gradient(135deg,var(--teal) 0%, #12a48f 100%);
+  display:grid;place-items:center;font-family:var(--disp);font-weight:700;color:#fff;font-size:19px;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.12);
+}
+.brand .txt b{display:block;font-family:var(--disp);color:#fff;font-size:15px;font-weight:600;letter-spacing:-.01em}
+.brand .txt span{font-size:11.5px;color:#8fb0aa;letter-spacing:.02em}
+.nav-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.13em;color:#6f938c;padding:14px 10px 6px;font-weight:600}
+.nav-item{
+  display:flex;align-items:center;gap:11px;
+  padding:9px 11px;border-radius:9px;color:#c3d6d2;
+  font-size:14px;font-weight:500;border:0;background:none;width:100%;text-align:left;
+  transition:background .12s,color .12s;
+}
+.nav-item svg{width:18px;height:18px;flex:0 0 auto;opacity:.85}
+.nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
+.nav-item.active{background:var(--teal);color:#fff}
+.nav-item.active svg{opacity:1}
+.nav-item .badge{margin-left:auto;background:rgba(255,255,255,.15);color:#fff;font-size:11px;padding:1px 7px;border-radius:20px;font-family:var(--disp);font-weight:500}
+.nav-item.locked{opacity:.32;cursor:not-allowed}
+.sidebar-foot{margin-top:auto;padding-top:14px;font-size:11px;color:#6f938c;border-top:1px solid rgba(255,255,255,.09)}
+
+.main{min-width:0;display:flex;flex-direction:column}
+.topbar{
+  background:var(--surface);border-bottom:1px solid var(--line);
+  padding:14px 30px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:30;
+}
+.topbar h1{font-size:20px;font-weight:600}
+.topbar .sub{font-size:12.5px;color:var(--muted);margin-top:1px}
+.topbar .spacer{flex:1}
+.rolepick{display:flex;align-items:center;gap:9px}
+.rolepick label{font-size:12px;color:var(--muted);font-weight:500}
+.rolepick select{
+  border:1px solid var(--line-strong);background:var(--paper);border-radius:20px;
+  padding:7px 12px;font-weight:600;color:var(--ink);font-size:13px;
+}
+.whoami{display:flex;align-items:center;gap:9px}
+.whoami .av{width:34px;height:34px;border-radius:50%;background:var(--teal-tint);color:var(--teal-dark);display:grid;place-items:center;font-family:var(--disp);font-weight:600;font-size:13px}
+.whoami .who b{display:block;font-size:13px;font-weight:600}
+.whoami .who span{font-size:11.5px;color:var(--muted)}
+
+.content{padding:26px 30px 60px;max-width:1200px;width:100%}
+.view{display:none;animation:fade .25s ease}
+.view.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ---------- Generic ---------- */
+.page-head{margin-bottom:22px}
+.page-head h2{font-size:26px;font-weight:600;letter-spacing:-.02em}
+.page-head p{color:var(--muted);margin:5px 0 0;font-size:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.card-pad{padding:20px 22px}
+.card-head{display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--line)}
+.card-head h3{font-size:15px;font-weight:600}
+.card-head .hint{font-size:12px;color:var(--muted);margin-left:auto;font-weight:500}
+
+.grid{display:grid;gap:16px}
+.g-2{grid-template-columns:repeat(2,1fr)}
+.g-3{grid-template-columns:repeat(3,1fr)}
+.g-4{grid-template-columns:repeat(4,1fr)}
+
+.btn{
+  border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);
+  padding:9px 15px;border-radius:9px;font-weight:600;font-size:13.5px;display:inline-flex;align-items:center;gap:7px;
+  transition:.12s;
+}
+.btn:hover{border-color:var(--teal);color:var(--teal-dark)}
+.btn svg{width:16px;height:16px}
+.btn.primary{background:var(--teal);border-color:var(--teal);color:#fff}
+.btn.primary:hover{background:var(--teal-dark);border-color:var(--teal-dark);color:#fff}
+.btn.ghost{border-color:transparent;background:var(--paper)}
+.btn.sm{padding:6px 11px;font-size:12.5px}
+.btn.danger:hover{border-color:var(--red);color:var(--red)}
+
+.field{margin-bottom:15px}
+.field label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-soft);margin-bottom:6px}
+.field input[type=text],.field input[type=date],.field input[type=time],.field select,.field textarea{
+  width:100%;border:1px solid var(--line-strong);border-radius:9px;padding:10px 12px;background:var(--surface);color:var(--ink);
+}
+.field textarea{resize:vertical;min-height:64px}
+.field input:focus,.field select:focus,.field textarea:focus{outline:2px solid var(--teal);outline-offset:0;border-color:var(--teal)}
+.help{font-size:11.5px;color:var(--muted);margin-top:4px}
+
+/* stat cards */
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:17px 18px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.stat .k{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.stat .v{font-family:var(--disp);font-size:32px;font-weight:600;line-height:1.05;margin-top:6px;letter-spacing:-.02em}
+.stat .d{font-size:12px;margin-top:6px;font-weight:500;color:var(--ink-soft)}
+.stat .rail{position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--teal)}
+.stat.amber .rail{background:var(--amber)}
+.stat.red .rail{background:var(--red)}
+.stat.green .rail{background:var(--green)}
+.trend-up{color:var(--red)} .trend-down{color:var(--green)} .trend-flat{color:var(--muted)}
+
+/* chips */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{
+  border:1.5px solid var(--line-strong);background:var(--surface);border-radius:22px;
+  padding:8px 14px;font-size:13px;font-weight:600;color:var(--ink-soft);transition:.1s;
+}
+.chip:hover{border-color:var(--teal);color:var(--teal-dark)}
+.chip.on{background:var(--teal);border-color:var(--teal);color:#fff}
+.chip.sev{min-width:0}
+.chip.sev.on.s1{background:var(--green);border-color:var(--green)}
+.chip.sev.on.s2{background:var(--yellow);border-color:var(--yellow);color:#5a4700}
+.chip.sev.on.s3{background:var(--orange);border-color:var(--orange)}
+.chip.sev.on.s4{background:var(--red);border-color:var(--red)}
+
+/* table */
+.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+.tbl th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;padding:11px 14px;border-bottom:1px solid var(--line)}
+.tbl td{padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:0}
+.tbl tr.clickable{cursor:pointer}
+.tbl tr.clickable:hover td{background:var(--teal-tint)}
+.tbl .num{font-family:var(--disp);font-weight:600}
+
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap}
+.pill.s1{background:var(--green-tint);color:#12703a}
+.pill.s2{background:var(--yellow-tint);color:#7a5c00}
+.pill.s3{background:var(--orange-tint);color:#9c4a10}
+.pill.s4{background:var(--red-tint);color:#a71f19}
+.pill.neutral{background:var(--paper);color:var(--ink-soft)}
+.pill.teal{background:var(--teal-tint);color:var(--teal-dark)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+
+.tag{display:inline-block;background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:2px 8px;font-size:11.5px;font-weight:600;color:var(--ink-soft);margin:2px 3px 2px 0}
+
+/* risk grid */
+.risk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(258px,1fr));gap:16px}
+.risk-card{border-radius:var(--radius);border:1px solid var(--line);background:var(--surface);box-shadow:var(--shadow);overflow:hidden}
+.risk-card .band{padding:14px 17px;color:#fff;display:flex;justify-content:space-between;align-items:flex-start}
+.risk-card .band .lv{font-family:var(--disp);font-weight:700;font-size:13px;letter-spacing:.03em;text-transform:uppercase;display:flex;align-items:center;gap:7px}
+.risk-card.g .band{background:var(--green)} .risk-card.y .band{background:var(--yellow);color:#4a3900} .risk-card.o .band{background:var(--orange)} .risk-card.r .band{background:var(--red)}
+.risk-card .band .score{font-family:var(--disp);font-weight:700;font-size:22px}
+.risk-card .body{padding:14px 17px}
+.risk-card .body .rm{font-weight:600;font-size:15px}
+.risk-card .body .sub{font-size:12px;color:var(--muted);margin-bottom:11px}
+.risk-metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.risk-metrics div{background:var(--paper);border-radius:8px;padding:7px 9px}
+.risk-metrics .rk{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+.risk-metrics .rv{font-family:var(--disp);font-weight:600;font-size:17px}
+
+/* timeline */
+.timeline{position:relative;padding-left:26px}
+.timeline::before{content:"";position:absolute;left:8px;top:4px;bottom:4px;width:2px;background:var(--line)}
+.tl-item{position:relative;padding:0 0 18px}
+.tl-item::before{content:"";position:absolute;left:-22px;top:4px;width:12px;height:12px;border-radius:50%;background:var(--surface);border:2.5px solid var(--teal)}
+.tl-item.s3::before{border-color:var(--orange)} .tl-item.s4::before{border-color:var(--red)} .tl-item.s2::before{border-color:var(--yellow)}
+.tl-item .when{font-size:12px;color:var(--muted);font-weight:600}
+.tl-item .what{font-weight:600;margin:2px 0}
+.tl-item .desc{font-size:13px;color:var(--ink-soft)}
+
+.empty{text-align:center;padding:44px 20px;color:var(--muted)}
+.empty svg{width:38px;height:38px;opacity:.4;margin-bottom:10px}
+
+/* toast */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--ink);color:#fff;padding:13px 20px;border-radius:11px;font-weight:600;font-size:14px;box-shadow:var(--shadow-lg);opacity:0;transition:.3s;z-index:200;display:flex;gap:9px;align-items:center}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.toast svg{width:18px;height:18px;color:#5fe0c4}
+
+/* modal */
+.modal-bg{position:fixed;inset:0;background:rgba(22,38,43,.5);backdrop-filter:blur(2px);z-index:100;display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto}
+.modal-bg.show{display:flex}
+.modal{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow-lg);width:100%;max-width:620px;animation:pop .2s ease}
+@keyframes pop{from{opacity:0;transform:scale(.97) translateY(8px)}to{opacity:1;transform:none}}
+.modal-head{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+.modal-head h3{font-size:18px;font-weight:600}
+.modal-head .x{margin-left:auto;border:0;background:var(--paper);width:32px;height:32px;border-radius:8px;font-size:18px;color:var(--ink-soft);display:grid;place-items:center}
+.modal-body{padding:20px 22px;max-height:66vh;overflow-y:auto}
+.modal-foot{padding:14px 22px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end}
+
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.toolbar .search{flex:1;min-width:200px;position:relative}
+.toolbar .search input{width:100%;padding-left:36px}
+.toolbar .search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:9px;overflow:hidden}
+.seg button{border:0;background:var(--surface);padding:8px 13px;font-size:13px;font-weight:600;color:var(--ink-soft)}
+.seg button.on{background:var(--teal);color:#fff}
+
+.two{display:grid;grid-template-columns:1.3fr 1fr;gap:16px}
+.list-scroll{max-height:420px;overflow-y:auto}
+.mini-row{display:flex;align-items:center;gap:11px;padding:10px 6px;border-bottom:1px solid var(--line)}
+.mini-row:last-child{border-bottom:0}
+.mini-row .av{width:34px;height:34px;border-radius:9px;background:var(--teal-tint);color:var(--teal-dark);display:grid;place-items:center;font-family:var(--disp);font-weight:600;font-size:13px;flex:0 0 auto}
+.mini-row .mn{font-weight:600;font-size:14px}
+.mini-row .mm{font-size:12px;color:var(--muted)}
+
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;font-size:13.5px}
+.kv dt{color:var(--muted);font-weight:600}
+.kv dd{margin:0;font-weight:500}
+
+.mobile-nav{display:none}
+
+@media(max-width:920px){
+  .app{grid-template-columns:1fr}
+  .sidebar{display:none}
+  .mobile-nav{display:flex;position:sticky;top:0;z-index:40;background:var(--ink);gap:4px;padding:8px;overflow-x:auto}
+  .mobile-nav button{border:0;background:rgba(255,255,255,.08);color:#c3d6d2;white-space:nowrap;padding:8px 12px;border-radius:8px;font-size:12.5px;font-weight:600}
+  .mobile-nav button.active{background:var(--teal);color:#fff}
+  .g-4,.g-3,.g-2,.two{grid-template-columns:1fr}
+  .content{padding:18px 16px 60px}
+  .topbar{padding:12px 16px;flex-wrap:wrap}
+  .whoami{display:none}
+}
+@media print{
+  .sidebar,.topbar,.toolbar,.mobile-nav,.btn,.nav-item{display:none !important}
+  .app{grid-template-columns:1fr}
+  .content{padding:0;max-width:none}
+  .card{box-shadow:none;border-color:#ccc}
+  body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .report .card,.report .stat,.report .grid>*{break-inside:avoid;page-break-inside:avoid}
+  .page-head p,.report h3{break-after:avoid}
+}
+.report{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="mark">B</div>
+      <div class="txt"><b>Behavior Portal</b><span>Bultum Academy · 26–27</span></div>
+    </div>
+    <div id="nav"></div>
+    <div class="sidebar-foot">
+      District 4295‑07 · Columbia Heights, MN<br/>
+      Data stored on this device.
+    </div>
+  </aside>
+
+  <div class="main">
+    <nav class="mobile-nav" id="mobileNav"></nav>
+    <header class="topbar">
+      <div>
+        <h1 id="pageTitle">Quick Entry</h1>
+        <div class="sub" id="pageSub">Log an incident in under a minute</div>
+      </div>
+      <div class="spacer"></div>
+      <div class="rolepick">
+        <label for="roleSel">Viewing as</label>
+        <select id="roleSel">
+          <option value="teacher">Teacher</option>
+          <option value="behavior">Behavior Team</option>
+          <option value="admin">Administrator</option>
+        </select>
+      </div>
+      <div class="whoami">
+        <div class="av" id="userAv">MC</div>
+        <div class="who"><b id="userName">Meg Cavalier</b><span id="userRole">Teacher</span></div>
+      </div>
+    </header>
+
+    <div class="content">
+      <section id="view-entry" class="view active"></section>
+      <section id="view-students" class="view"></section>
+      <section id="view-interventions" class="view"></section>
+      <section id="view-support" class="view"></section>
+      <section id="view-monthly" class="view"></section>
+      <section id="view-risk" class="view"></section>
+      <section id="view-search" class="view"></section>
+      <section id="view-admin" class="view"></section>
+      <section id="view-report" class="view"></section>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modalBg"><div class="modal" id="modal"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* ============================================================
+   Bultum Behavior Management Portal — single-file app
+   Persistence: localStorage (key: bultum_behavior_v1)
+   ============================================================ */
+
+const STORE_KEY = "bultum_behavior_v1";
+const SEV = {1:"Minor",2:"Moderate",3:"Serious",4:"Critical"};
+const CATEGORIES = ["Physical aggression","Verbal aggression","Defiance","Disrespect","Classroom disruption","Refusal to work","Leaving classroom","Running away","Unsafe behavior","Bullying","Harassment","Property destruction","Technology misuse","Inappropriate language","Fighting","Threats","Elopement","Non-compliance","Other"];
+const CAT_SEV = {"Physical aggression":4,"Fighting":4,"Running away":4,"Elopement":4,"Threats":4,"Unsafe behavior":3,"Bullying":3,"Harassment":3,"Property destruction":3,"Verbal aggression":2,"Defiance":2,"Refusal to work":2,"Leaving classroom":2,"Inappropriate language":2,"Non-compliance":2,"Disrespect":2,"Disruption":1,"Classroom disruption":1,"Disrespect ":1,"Technology misuse":2,"Other":2};
+const LOCATIONS = ["Classroom","Hallway","Cafeteria","Playground","Gym","Bus / Loading","Restroom","Library","Office","Specials","Arrival / Dismissal"];
+const CONSEQUENCES = ["Restorative Conversation","Check-In/Check-Out","Time Out","Parent Contact","Counseling Referral","Office Referral","Lunch Detention","After School Detention","Behavior Contract","In-School Suspension (ISS)","Out-of-School Suspension (OSS)","Behavior Intervention Plan (BIP)","Functional Behavior Assessment (FBA)"];
+const USERS = {
+  teacher:{name:"Meg Cavalier",role:"Teacher",init:"MC"},
+  behavior:{name:"Saido Abdirashid",role:"Behavior Team",init:"SA"},
+  admin:{name:"Abas (Asst. Director)",role:"Administrator",init:"AB"}
+};
+
+/* ---------- utilities ---------- */
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const uid=()=>Math.random().toString(36).slice(2,10);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const initials=n=>n.split(/\s+/).map(w=>w[0]).slice(0,2).join("").toUpperCase();
+const fmtDate=d=>new Date(d+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
+const fmtDateShort=d=>new Date(d+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"});
+const todayStr=()=>new Date().toISOString().slice(0,10);
+const daysAgo=n=>{const d=new Date();d.setDate(d.getDate()-n);return d.toISOString().slice(0,10);};
+const nowTime=()=>new Date().toTimeString().slice(0,5);
+const timeBucket=t=>{const h=+t.slice(0,2);if(h<9)return"Before 9am";if(h<11)return"9–11am";if(h<13)return"11am–1pm";if(h<15)return"1–3pm";return"After 3pm";};
+
+/* ---------- state ---------- */
+let DB=load();
+let ROLE="teacher";
+let activeView="entry";
+
+function load(){
+  try{const raw=localStorage.getItem(STORE_KEY);if(raw)return JSON.parse(raw);}catch(e){}
+  const seeded=seed();
+  try{localStorage.setItem(STORE_KEY,JSON.stringify(seeded));}catch(e){}
+  return seeded;
+}
+function save(){try{localStorage.setItem(STORE_KEY,JSON.stringify(DB));}catch(e){toast("Couldn't save — storage may be full");}}
+
+/* ---------- seed data ---------- */
+function seed(){
+  const teachers=[
+    {name:"Meg Cavalier",grade:"3",room:"Rm 104"},
+    {name:"Daniel Osei",grade:"4",room:"Rm 112"},
+    {name:"Rachel Nguyen",grade:"2",room:"Rm 101"},
+    {name:"Tomas Herrera",grade:"5",room:"Rm 118"},
+    {name:"Halima Warsame",grade:"K",room:"Rm 100"},
+    {name:"Grace Bekele",grade:"6",room:"Rm 121"}
+  ];
+  const first=["Amina","Yusuf","Layla","Omar","Sagal","Ibrahim","Nadia","Malik","Hodan","Isaac","Fatima","Elias","Zahra","Musa","Iman","Deqa","Abdi","Sofia","Liban","Rahma","Jamal","Nasra","Kevin","Aaliyah"];
+  const last=["Ahmed","Hassan","Ali","Warsame","Mohamed","Osman","Farah","Yusuf","Abdi","Dahir","Noor","Aden","Jama","Omar","Ismail","Barre"];
+  const students=[];
+  let sid=1001;
+  teachers.forEach(t=>{
+    const n=t.grade==="K"?4:5;
+    for(let i=0;i<n;i++){
+      students.push({
+        id:"S"+(sid++),
+        name:first[(students.length*7+i)%first.length]+" "+last[(students.length*3+i)%last.length],
+        grade:t.grade,room:t.room,teacher:t.name
+      });
+    }
+  });
+  // give a few repeat names uniqueness
+  const seen={};
+  students.forEach(s=>{if(seen[s.name])s.name=s.name+" "+String.fromCharCode(66+seen[s.name]);seen[s.name]=(seen[s.name]||0)+1;});
+
+  const incidents=[], support=[], consequences=[];
+  const rnd=(a)=>a[Math.floor(Math.random()*a.length)];
+  // weight incidents toward a few students/rooms so risk dashboard is meaningful
+  const hot=students.filter(s=>["3","5","6"].includes(s.grade)).slice(0,7);
+  function addIncident(stu,dayOffset){
+    const cat=rnd(CATEGORIES.filter(c=>c!=="Other").concat(["Other"]));
+    const sev=CAT_SEV[cat]||2;
+    const t=["08:20","09:45","10:30","11:15","12:40","13:25","14:10","14:50"][Math.floor(Math.random()*8)];
+    const inc={
+      id:uid(),student:stu.id,studentName:stu.name,grade:stu.grade,room:stu.room,teacher:stu.teacher,
+      date:daysAgo(dayOffset),time:t,location:rnd(LOCATIONS),reporter:stu.teacher,
+      severity:sev,category:cat,
+      description:descFor(cat,stu),
+      studentResponse:rnd(["De-escalated after break","Refused to respond","Apologized","Remained upset","Complied after prompt","Needed space"]),
+      staffResponse:rnd(["Redirected & offered choice","Proximity + reminder","Moved to calm corner","Called behavior support","Restorative check-in","Break in hallway"]),
+      supportRequested:sev>=3||Math.random()<.25,
+      immediateAction:rnd(["Verbal redirect","Break / reset","Removed from area","Parent phone call","Sent to office","Restorative conversation"]),
+      witnesses:Math.random()<.3?"Para: J. Salaad":"",
+      followUp:Math.random()<.4?"Check in tomorrow AM; loop in family.":"",
+      createdBy:stu.teacher
+    };
+    incidents.push(inc);
+    if(inc.supportRequested){
+      support.push({
+        id:uid(),teacher:stu.teacher,grade:stu.grade,room:stu.room,student:stu.id,studentName:stu.name,
+        date:inc.date,time:inc.time,reason:cat,responder:rnd(["Saido Abdirashid","J. Salaad","Behavior Team"]),
+        arrived:addMin(inc.time,rnd([3,4,6,8])),outcome:rnd(["Student reset, returned to class","Removed for the period","Family contacted","Restorative plan started"])
+      });
+    }
+    if(sev>=3&&Math.random()<.7){
+      const c=sev===4?rnd(["Office Referral","In-School Suspension (ISS)","Parent Contact","Restorative Conversation"]):rnd(["Restorative Conversation","Parent Contact","Check-In/Check-Out","Office Referral"]);
+      consequences.push({
+        id:uid(),student:stu.id,studentName:stu.name,type:c,date:inc.date,assignedBy:rnd(["Abas","Saido Abdirashid"]),
+        duration:c.includes("Suspension")?"1 day":(c.includes("Detention")?"30 min":"—"),
+        reason:cat,status:rnd(["Completed","Completed","In progress","Scheduled"]),notes:"",incident:inc.id
+      });
+    }
+  }
+  // baseline spread
+  students.forEach(s=>{const c=Math.random()<.5?0:(Math.random()<.6?1:2);for(let i=0;i<c;i++)addIncident(s,Math.floor(Math.random()*40));});
+  // hot students, more recent + trending up
+  hot.forEach((s,i)=>{const c=6+Math.floor(Math.random()*6);for(let j=0;j<c;j++)addIncident(s,Math.floor(Math.random()*(j<c/2?14:35)));});
+
+  incidents.sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time));
+  return {students,teachers,incidents,support,consequences,meta:{created:todayStr()}};
+}
+function addMin(t,m){const[h,mi]=t.split(":").map(Number);const d=new Date(0,0,0,h,mi+m);return d.toTimeString().slice(0,5);}
+function descFor(cat,s){
+  const map={
+    "Refusal to work":`Declined to start independent work; put head down during math rotation.`,
+    "Classroom disruption":`Called out repeatedly during whole-group; disrupted neighbors.`,
+    "Defiance":`Told to line up, said "no" and walked to the back of the room.`,
+    "Physical aggression":`Pushed a peer during transition after a disagreement over materials.`,
+    "Leaving classroom":`Left the room without permission during writing block.`,
+    "Verbal aggression":`Raised voice and used unkind words toward a classmate.`,
+    "Inappropriate language":`Used profanity when frustrated with an assignment.`,
+    "Property destruction":`Knocked materials off desk and tore a worksheet.`,
+    "Elopement":`Left the assigned area and headed toward the exit; recovered by staff.`,
+    "Fighting":`Physical altercation with a peer at recess; separated by staff.`,
+    "Bullying":`Repeated teasing of a classmate reported by two students.`,
+    "Non-compliance":`Did not follow directions after multiple prompts.`
+  };
+  return map[cat]||`${cat} incident involving ${s.name.split(" ")[0]}; documented by classroom teacher.`;
+}
+
+/* ============================================================
+   RISK ENGINE
+   ============================================================ */
+function classroomStats(windowDays=30){
+  const cutoff=daysAgo(windowDays), mid=daysAgo(Math.floor(windowDays/2));
+  const rooms={};
+  DB.teachers.forEach(t=>{rooms[t.room]={teacher:t.name,grade:t.grade,room:t.room,incidents:0,recent:0,earlier:0,calls:0,referrals:0,suspensions:0};});
+  DB.incidents.forEach(i=>{
+    if(i.date<cutoff)return;const r=rooms[i.room];if(!r)return;
+    r.incidents++;
+    if(i.date>=mid)r.recent++;else r.earlier++;
+  });
+  DB.support.forEach(s=>{if(s.date>=cutoff&&rooms[s.room])rooms[s.room].calls++;});
+  DB.consequences.forEach(c=>{
+    if(c.date<cutoff)return;const stu=DB.students.find(x=>x.id===c.student);if(!stu||!rooms[stu.room])return;
+    if(c.type.includes("Office"))rooms[stu.room].referrals++;
+    if(c.type.includes("Suspension"))rooms[stu.room].suspensions++;
+  });
+  Object.values(rooms).forEach(r=>{
+    r.score=r.incidents*1 + r.calls*2 + r.referrals*2 + r.suspensions*4;
+    r.trend = r.recent>r.earlier+1?"Worsening":(r.recent<r.earlier-1?"Improving":"Stable");
+    r.level = r.score>=22?"r":r.score>=12?"o":r.score>=5?"y":"g";
+  });
+  return Object.values(rooms).sort((a,b)=>b.score-a.score);
+}
+const LEVEL_LABEL={g:"Low concern",y:"Moderate",o:"High concern",r:"Critical"};
+const LEVEL_FULL={g:"green",y:"yellow",o:"orange",r:"red"};
+
+function studentIncidents(id){return DB.incidents.filter(i=>i.student===id).sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time));}
+function studentConsequences(id){return DB.consequences.filter(c=>c.student===id).sort((a,b)=>b.date.localeCompare(a.date));}
+function within(days){const c=daysAgo(days);return DB.incidents.filter(i=>i.date>=c);}
+
+/* ============================================================
+   NAVIGATION
+   ============================================================ */
+const NAV=[
+  {id:"entry",label:"Quick Entry",title:"Quick Entry",sub:"Log an incident in under a minute",roles:["teacher","behavior","admin"],icon:'M12 5v14M5 12h14'},
+  {id:"students",label:"Student Profiles",title:"Student Behavior Profiles",sub:"Full history and patterns for each student",roles:["teacher","behavior","admin"],icon:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM22 21v-2a4 4 0 0 0-3-3.87M16 3.13A4 4 0 0119 7'},
+  {id:"interventions",label:"Interventions",title:"Consequences & Interventions",sub:"Track supports assigned and their follow-through",roles:["behavior","admin"],icon:'M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11'},
+  {id:"support",label:"Support Requests",title:"Teacher Behavior Support",sub:"Requests to the Behavior Team over time",roles:["behavior","admin"],icon:'M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0'},
+  {id:"monthly",label:"Monthly Dashboard",title:"Monthly Behavior Dashboard",sub:"Trends and patterns for data meetings",roles:["behavior","admin"],icon:'M3 3v18h18M18 17V9M13 17V5M8 17v-3'},
+  {id:"risk",label:"Classroom Risk",title:"Classroom Behavior Risk",sub:"Live status to help prioritize support",roles:["behavior","admin"],icon:'M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z'},
+  {id:"search",label:"Search & Reports",title:"Search & Reporting",sub:"Filter, review, and export records",roles:["behavior","admin"],icon:'M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z'},
+  {id:"admin",label:"Admin Overview",title:"Administrative Dashboard",sub:"School-wide climate at a glance",roles:["admin"],icon:'M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z'},
+  {id:"report",label:"Big Picture Report",title:"Big Picture Report",sub:"One-page visual summary for print or PDF",roles:["behavior","admin"],icon:'M2 3h20v14H2zM8 21h8M12 17v4'}
+];
+function svg(p){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${p}"/></svg>`;}
+
+function renderNav(){
+  const nav=$("#nav"),mob=$("#mobileNav");
+  nav.innerHTML=`<div class="nav-label">Workspace</div>`;
+  mob.innerHTML="";
+  NAV.forEach(n=>{
+    const allowed=n.roles.includes(ROLE);
+    const b=document.createElement("button");
+    b.className="nav-item"+(n.id===activeView?" active":"")+(allowed?"":" locked");
+    b.innerHTML=svg(n.icon)+`<span>${n.label}</span>`+badgeFor(n.id);
+    if(allowed)b.onclick=()=>go(n.id); else b.title="Not available for this role";
+    nav.appendChild(b);
+    if(allowed){
+      const mb=document.createElement("button");
+      mb.textContent=n.label;mb.className=n.id===activeView?"active":"";mb.onclick=()=>go(n.id);
+      mob.appendChild(mb);
+    }
+  });
+}
+function badgeFor(id){
+  if(id==="risk"){const crit=classroomStats().filter(r=>r.level==="r"||r.level==="o").length;return crit?`<span class="badge">${crit}</span>`:"";}
+  if(id==="support"){const open=DB.support.filter(s=>s.date>=daysAgo(7)).length;return open?`<span class="badge">${open}</span>`:"";}
+  return "";
+}
+function go(id){
+  const n=NAV.find(x=>x.id===id);if(!n||!n.roles.includes(ROLE))return;
+  activeView=id;
+  $$(".view").forEach(v=>v.classList.remove("active"));
+  $("#view-"+id).classList.add("active");
+  $("#pageTitle").textContent=n.title;$("#pageSub").textContent=n.sub;
+  renderNav();
+  RENDER[id]&&RENDER[id]();
+  window.scrollTo(0,0);
+}
+
+/* ============================================================
+   VIEW RENDERERS
+   ============================================================ */
+const RENDER={};
+
+/* ---- 1. Quick Entry ---- */
+let entryState=null;
+RENDER.entry=function(){
+  const el=$("#view-entry");
+  if(!entryState)resetEntry();
+  const s=entryState;
+  const myStudents = ROLE==="teacher"
+    ? DB.students.filter(x=>x.teacher===USERS.teacher.name)
+    : DB.students;
+  el.innerHTML=`
+   <div class="page-head"><h2>Quick incident entry</h2><p>Tap through the fields — most reports take 30–60 seconds. Details are optional.</p></div>
+   <div class="grid g-2" style="align-items:start">
+    <div class="card card-pad">
+      <div class="field">
+        <label>Student</label>
+        <input type="text" id="stuSearch" placeholder="Type a name…" autocomplete="off" value="${s.student?esc(s.studentName):""}"/>
+        <div id="stuResults"></div>
+      </div>
+      <div class="field">
+        <label>Behavior — tap one</label>
+        <div class="chips" id="catChips">
+          ${CATEGORIES.map(c=>`<button class="chip ${s.category===c?"on":""}" data-cat="${esc(c)}">${esc(c)}</button>`).join("")}
+        </div>
+      </div>
+      <div class="field">
+        <label>Severity</label>
+        <div class="chips" id="sevChips">
+          ${[1,2,3,4].map(n=>`<button class="chip sev s${n} ${s.severity===n?"on":""}" data-sev="${n}">${SEV[n]}</button>`).join("")}
+        </div>
+      </div>
+      <div class="grid g-2">
+        <div class="field"><label>Location</label>
+          <select id="loc">${LOCATIONS.map(l=>`<option ${s.location===l?"selected":""}>${l}</option>`).join("")}</select></div>
+        <div class="field"><label>Time</label><input type="time" id="time" value="${s.time}"/></div>
+      </div>
+    </div>
+
+    <div class="card card-pad">
+      <div class="field"><label>Brief notes (optional)</label>
+        <textarea id="desc" placeholder="What happened, in a sentence…">${esc(s.description)}</textarea></div>
+      <div class="grid g-2">
+        <div class="field"><label>Student response</label><input type="text" id="stuResp" value="${esc(s.studentResponse)}" placeholder="e.g. took a break"/></div>
+        <div class="field"><label>Staff response</label><input type="text" id="staffResp" value="${esc(s.staffResponse)}" placeholder="e.g. redirected"/></div>
+      </div>
+      <div class="grid g-2">
+        <div class="field"><label>Immediate action</label>
+          <select id="action"><option value="">—</option>${["Verbal redirect","Break / reset","Removed from area","Parent phone call","Sent to office","Restorative conversation"].map(a=>`<option ${s.immediateAction===a?"selected":""}>${a}</option>`).join("")}</select></div>
+        <div class="field"><label>Behavior support needed?</label>
+          <div class="seg" id="supSeg"><button data-sup="no" class="${!s.supportRequested?"on":""}">No</button><button data-sup="yes" class="${s.supportRequested?"on":""}">Yes — call team</button></div></div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:6px">
+        <button class="btn primary" id="saveInc">${svg('M20 6L9 17l-5-5')} Save incident</button>
+        <button class="btn ghost" id="clearInc">Clear</button>
+      </div>
+    </div>
+   </div>
+
+   <div class="card" style="margin-top:20px">
+     <div class="card-head"><h3>Recent entries</h3><span class="hint">${ROLE==="teacher"?"Your classroom":"All classrooms"} · last 10</span></div>
+     <div style="overflow-x:auto"><table class="tbl" id="recentTbl"></table></div>
+   </div>`;
+
+  // student search
+  const inp=$("#stuSearch"),res=$("#stuResults");
+  inp.oninput=()=>{
+    const q=inp.value.trim().toLowerCase();
+    if(!q){res.innerHTML="";s.student=null;return;}
+    const hits=myStudents.filter(x=>x.name.toLowerCase().includes(q)).slice(0,6);
+    res.innerHTML=`<div class="card" style="margin-top:6px">`+hits.map(h=>
+      `<div class="mini-row clickable" data-id="${h.id}" style="cursor:pointer;padding:8px 10px">
+        <div class="av">${initials(h.name)}</div><div><div class="mn">${esc(h.name)}</div><div class="mm">Grade ${h.grade} · ${esc(h.teacher)}</div></div></div>`).join("")+`</div>`;
+    $$("#stuResults .mini-row").forEach(r=>r.onclick=()=>{
+      const st=myStudents.find(x=>x.id===r.dataset.id);
+      s.student=st.id;s.studentName=st.name;s.grade=st.grade;s.room=st.room;s.teacher=st.teacher;
+      inp.value=st.name;res.innerHTML="";
+    });
+  };
+  $$("#catChips .chip").forEach(c=>c.onclick=()=>{
+    s.category=c.dataset.cat;
+    if(!s.severity)s.severity=CAT_SEV[s.category]||2;
+    RENDER.entry();
+  });
+  $$("#sevChips .chip").forEach(c=>c.onclick=()=>{s.severity=+c.dataset.sev;RENDER.entry();});
+  $$("#supSeg button").forEach(b=>b.onclick=()=>{s.supportRequested=b.dataset.sup==="yes";RENDER.entry();});
+  ["loc","time","desc","stuResp","staffResp","action"].forEach(id=>{
+    const map={loc:"location",time:"time",desc:"description",stuResp:"studentResponse",staffResp:"staffResponse",action:"immediateAction"};
+    $("#"+id).oninput=e=>s[map[id]]=e.target.value;
+    $("#"+id).onchange=e=>s[map[id]]=e.target.value;
+  });
+  $("#clearInc").onclick=()=>{resetEntry();RENDER.entry();};
+  $("#saveInc").onclick=saveIncident;
+  renderRecent();
+};
+function resetEntry(){entryState={student:null,studentName:"",grade:"",room:"",teacher:"",category:"",severity:0,location:"Classroom",time:nowTime(),description:"",studentResponse:"",staffResponse:"",immediateAction:"",supportRequested:false};}
+function saveIncident(){
+  const s=entryState;
+  if(!s.student){toast("Pick a student first");return;}
+  if(!s.category){toast("Choose a behavior");return;}
+  if(!s.severity)s.severity=CAT_SEV[s.category]||2;
+  const inc={id:uid(),student:s.student,studentName:s.studentName,grade:s.grade,room:s.room,teacher:s.teacher,
+    date:todayStr(),time:s.time,location:s.location,reporter:USERS[ROLE].name,severity:s.severity,category:s.category,
+    description:s.description,studentResponse:s.studentResponse,staffResponse:s.staffResponse,
+    supportRequested:s.supportRequested,immediateAction:s.immediateAction,witnesses:"",followUp:"",createdBy:USERS[ROLE].name};
+  DB.incidents.unshift(inc);
+  if(s.supportRequested){
+    DB.support.unshift({id:uid(),teacher:s.teacher,grade:s.grade,room:s.room,student:s.student,studentName:s.studentName,
+      date:todayStr(),time:s.time,reason:s.category,responder:"Behavior Team",arrived:"",outcome:"Pending response"});
+  }
+  save();resetEntry();RENDER.entry();renderNav();
+  toast("Incident logged"+(s.supportRequested?" · Behavior Team notified":""));
+}
+function renderRecent(){
+  const mine = ROLE==="teacher"?DB.incidents.filter(i=>i.teacher===USERS.teacher.name):DB.incidents;
+  const rows=mine.slice(0,10);
+  $("#recentTbl").innerHTML=`<thead><tr><th>Student</th><th>Behavior</th><th>Severity</th><th>When</th><th>Location</th></tr></thead><tbody>`+
+   (rows.length?rows.map(i=>`<tr class="clickable" data-id="${i.student}">
+     <td><b>${esc(i.studentName)}</b><div class="mm" style="color:var(--muted);font-size:12px">Gr ${i.grade}</div></td>
+     <td>${esc(i.category)}</td>
+     <td><span class="pill s${i.severity}">${SEV[i.severity]}</span></td>
+     <td>${fmtDateShort(i.date)} · ${i.time}</td>
+     <td>${esc(i.location)}</td></tr>`).join("")
+     :`<tr><td colspan="5" class="empty">No entries yet — log your first one above.</td></tr>`)+`</tbody>`;
+  $$("#recentTbl tr.clickable").forEach(r=>r.onclick=()=>openStudent(r.dataset.id));
+}
+
+/* ---- 2. Student Profiles ---- */
+let studentQuery="";
+RENDER.students=function(){
+  const el=$("#view-students");
+  const list=DB.students
+    .filter(s=>ROLE!=="teacher"||s.teacher===USERS.teacher.name)
+    .map(s=>({...s,count:studentIncidents(s.id).length}))
+    .filter(s=>s.name.toLowerCase().includes(studentQuery.toLowerCase()))
+    .sort((a,b)=>b.count-a.count||a.name.localeCompare(b.name));
+  el.innerHTML=`
+   <div class="page-head"><h2>Student behavior profiles</h2><p>${ROLE==="teacher"?"Students in your classroom.":"Every student’s complete behavioral history."} Tap a name to open the full record.</p></div>
+   <div class="toolbar">
+     <div class="search">${svg('M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z')}<input type="text" id="stuQ" placeholder="Search students…" value="${esc(studentQuery)}"/></div>
+   </div>
+   <div class="card"><div style="overflow-x:auto"><table class="tbl">
+     <thead><tr><th>Student</th><th>Grade</th><th>Teacher</th><th>Incidents (YTD)</th><th>Last incident</th><th></th></tr></thead>
+     <tbody>${list.length?list.map(s=>{const last=studentIncidents(s.id)[0];return `<tr class="clickable" data-id="${s.id}">
+        <td><div style="display:flex;align-items:center;gap:10px"><div class="av" style="width:32px;height:32px;border-radius:8px;background:var(--teal-tint);color:var(--teal-dark);display:grid;place-items:center;font-family:var(--disp);font-weight:600;font-size:12px">${initials(s.name)}</div><b>${esc(s.name)}</b></div></td>
+        <td>${s.grade}</td><td>${esc(s.teacher)}</td>
+        <td><span class="num">${s.count}</span></td>
+        <td>${last?fmtDateShort(last.date):'<span style="color:var(--muted)">—</span>'}</td>
+        <td style="text-align:right;color:var(--muted)">${svg('M9 18l6-6-6-6')}</td></tr>`;}).join("")
+        :`<tr><td colspan="6" class="empty">No students match “${esc(studentQuery)}”.</td></tr>`}</tbody>
+   </table></div></div>`;
+  $("#stuQ").oninput=e=>{studentQuery=e.target.value;RENDER.students();$("#stuQ").focus();};
+  $$("#view-students tr.clickable").forEach(r=>r.onclick=()=>openStudent(r.dataset.id));
+};
+function openStudent(id){
+  const s=DB.students.find(x=>x.id===id);if(!s)return;
+  const incs=studentIncidents(id), cons=studentConsequences(id);
+  const cats={};incs.forEach(i=>cats[i.category]=(cats[i.category]||0)+1);
+  const topCats=Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,4);
+  const recent30=incs.filter(i=>i.date>=daysAgo(30)).length, prev30=incs.filter(i=>i.date>=daysAgo(60)&&i.date<daysAgo(30)).length;
+  const trend=recent30>prev30?"up":recent30<prev30?"down":"flat";
+  const canIntervene=ROLE!=="teacher";
+  modal(`
+    <div class="modal-head"><div class="av" style="background:var(--teal-tint);color:var(--teal-dark)">${initials(s.name)}</div>
+      <div><h3>${esc(s.name)}</h3><div class="sub" style="font-size:12.5px;color:var(--muted)">${s.id} · Grade ${s.grade} · ${esc(s.room)} · ${esc(s.teacher)}</div></div>
+      <button class="x" onclick="closeModal()">×</button></div>
+    <div class="modal-body">
+      <div class="grid g-3" style="margin-bottom:18px">
+        <div class="stat"><div class="rail"></div><div class="k">Incidents YTD</div><div class="v">${incs.length}</div></div>
+        <div class="stat ${trend==="up"?"red":"green"}"><div class="rail"></div><div class="k">Last 30 days</div><div class="v">${recent30}</div><div class="d ${trend==="up"?"trend-up":trend==="down"?"trend-down":"trend-flat"}">${trend==="up"?"▲ up from "+prev30:trend==="down"?"▼ down from "+prev30:"– same as prior"}</div></div>
+        <div class="stat amber"><div class="rail"></div><div class="k">Interventions</div><div class="v">${cons.length}</div></div>
+      </div>
+      ${topCats.length?`<div class="field"><label>Most frequent patterns</label><div>${topCats.map(([c,n])=>`<span class="tag">${esc(c)} · ${n}</span>`).join("")}</div></div>`:""}
+      ${canIntervene?`<div style="margin:10px 0 18px"><button class="btn sm" onclick="addConsequenceFor('${s.id}')">${svg('M12 5v14M5 12h14')} Record intervention</button></div>`:""}
+      <h4 style="font-size:14px;margin:16px 0 12px">Incident timeline</h4>
+      ${incs.length?`<div class="timeline">${incs.slice(0,25).map(i=>`
+        <div class="tl-item s${i.severity}">
+          <div class="when">${fmtDate(i.date)} · ${i.time} · ${esc(i.location)}</div>
+          <div class="what">${esc(i.category)} <span class="pill s${i.severity}" style="margin-left:6px">${SEV[i.severity]}</span></div>
+          <div class="desc">${esc(i.description||"")}</div>
+          ${i.staffResponse?`<div class="desc" style="color:var(--muted);font-size:12px;margin-top:2px">Staff: ${esc(i.staffResponse)}${i.supportRequested?" · support requested":""}</div>`:""}
+        </div>`).join("")}</div>`:`<div class="empty">No incidents on record — a positive sign.</div>`}
+      ${cons.length?`<h4 style="font-size:14px;margin:22px 0 10px">Interventions & consequences</h4>
+        <table class="tbl"><thead><tr><th>Type</th><th>Date</th><th>Reason</th><th>Status</th></tr></thead><tbody>
+        ${cons.map(c=>`<tr><td><b>${esc(c.type)}</b></td><td>${fmtDateShort(c.date)}</td><td>${esc(c.reason)}</td><td><span class="pill ${c.status==="Completed"?"teal":"neutral"}">${esc(c.status)}</span></td></tr>`).join("")}
+        </tbody></table>`:""}
+    </div>
+    <div class="modal-foot"><button class="btn" onclick="printStudent('${s.id}')">${svg('M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z')} Print record</button><button class="btn primary" onclick="closeModal()">Done</button></div>
+  `);
+}
+function printStudent(id){toast("Use your browser’s print dialog to save as PDF");setTimeout(()=>window.print(),400);}
+
+/* ---- 3. Interventions ---- */
+let intFilter="all";
+RENDER.interventions=function(){
+  const el=$("#view-interventions");
+  let list=[...DB.consequences].sort((a,b)=>b.date.localeCompare(a.date));
+  if(intFilter==="open")list=list.filter(c=>c.status!=="Completed");
+  if(intFilter==="serious")list=list.filter(c=>c.type.includes("Suspension")||c.type.includes("Referral")||c.type.includes("BIP")||c.type.includes("FBA"));
+  const counts={};DB.consequences.forEach(c=>counts[c.type]=(counts[c.type]||0)+1);
+  const top=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  el.innerHTML=`
+   <div class="page-head"><h2>Consequences & interventions</h2><p>A complete record of supports assigned and whether they were carried through.</p></div>
+   <div class="grid g-4" style="margin-bottom:18px">
+     <div class="stat"><div class="rail"></div><div class="k">Total logged</div><div class="v">${DB.consequences.length}</div></div>
+     <div class="stat amber"><div class="rail"></div><div class="k">In progress</div><div class="v">${DB.consequences.filter(c=>c.status==="In progress"||c.status==="Scheduled").length}</div></div>
+     <div class="stat green"><div class="rail"></div><div class="k">Completed</div><div class="v">${DB.consequences.filter(c=>c.status==="Completed").length}</div></div>
+     <div class="stat red"><div class="rail"></div><div class="k">Suspensions</div><div class="v">${DB.consequences.filter(c=>c.type.includes("Suspension")).length}</div></div>
+   </div>
+   <div class="two">
+     <div class="card">
+       <div class="card-head"><h3>Records</h3>
+         <div class="seg" style="margin-left:auto" id="intSeg"><button data-f="all" class="${intFilter==="all"?"on":""}">All</button><button data-f="open" class="${intFilter==="open"?"on":""}">Open</button><button data-f="serious" class="${intFilter==="serious"?"on":""}">Serious</button></div>
+       </div>
+       <div style="overflow-x:auto"><table class="tbl">
+         <thead><tr><th>Student</th><th>Intervention</th><th>Date</th><th>Status</th><th></th></tr></thead>
+         <tbody>${list.length?list.map(c=>`<tr>
+           <td><b>${esc(c.studentName)}</b></td><td>${esc(c.type)}<div class="mm" style="font-size:11.5px;color:var(--muted)">${esc(c.reason||"")}</div></td>
+           <td>${fmtDateShort(c.date)}</td>
+           <td><span class="pill ${c.status==="Completed"?"teal":c.status==="In progress"?"s2":"neutral"}">${esc(c.status)}</span></td>
+           <td style="text-align:right">${c.status!=="Completed"?`<button class="btn sm" data-done="${c.id}">Mark done</button>`:""}</td>
+         </tr>`).join(""):`<tr><td colspan="5" class="empty">No records in this view.</td></tr>`}</tbody>
+       </table></div>
+     </div>
+     <div class="card card-pad">
+       <h3 style="font-size:15px;margin-bottom:6px">Most-used interventions</h3>
+       <p style="color:var(--muted);font-size:12.5px;margin:0 0 14px">Restorative-first supports lead; removals are a last resort.</p>
+       ${top.map(([t,n])=>{const max=top[0][1];return `<div style="margin-bottom:11px">
+          <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:4px"><span>${esc(t)}</span><span class="num">${n}</span></div>
+          <div style="height:8px;background:var(--paper);border-radius:6px;overflow:hidden"><div style="height:100%;width:${Math.round(n/max*100)}%;background:${t.includes("Suspension")?"var(--red)":t.includes("Referral")?"var(--orange)":"var(--teal)"}"></div></div>
+        </div>`;}).join("")}
+       <button class="btn primary sm" style="margin-top:12px;width:100%" onclick="addConsequenceFor()">${svg('M12 5v14M5 12h14')} Record new intervention</button>
+     </div>
+   </div>`;
+  $$("#intSeg button").forEach(b=>b.onclick=()=>{intFilter=b.dataset.f;RENDER.interventions();});
+  $$("#view-interventions [data-done]").forEach(b=>b.onclick=()=>{
+    const c=DB.consequences.find(x=>x.id===b.dataset.done);if(c){c.status="Completed";save();RENDER.interventions();toast("Marked complete");}
+  });
+};
+function addConsequenceFor(studentId){
+  const opts=DB.students.map(s=>`<option value="${s.id}" ${s.id===studentId?"selected":""}>${esc(s.name)} — Gr ${s.grade}</option>`).join("");
+  modal(`
+   <div class="modal-head"><h3>Record intervention</h3><button class="x" onclick="closeModal()">×</button></div>
+   <div class="modal-body">
+     <div class="field"><label>Student</label><select id="cStu">${opts}</select></div>
+     <div class="grid g-2">
+       <div class="field"><label>Intervention / consequence</label><select id="cType">${CONSEQUENCES.map(c=>`<option>${c}</option>`).join("")}</select></div>
+       <div class="field"><label>Date</label><input type="date" id="cDate" value="${todayStr()}"/></div>
+     </div>
+     <div class="grid g-2">
+       <div class="field"><label>Reason</label><input type="text" id="cReason" placeholder="Tied to which behavior?"/></div>
+       <div class="field"><label>Duration</label><input type="text" id="cDur" placeholder="e.g. 30 min, 1 day, —"/></div>
+     </div>
+     <div class="field"><label>Notes / follow-up</label><textarea id="cNotes" placeholder="Plan, family contact, next check-in…"></textarea></div>
+   </div>
+   <div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" id="cSave">Save intervention</button></div>
+  `);
+  $("#cSave").onclick=()=>{
+    const sid=$("#cStu").value;const stu=DB.students.find(x=>x.id===sid);
+    DB.consequences.unshift({id:uid(),student:sid,studentName:stu.name,type:$("#cType").value,date:$("#cDate").value,
+      assignedBy:USERS[ROLE].name,duration:$("#cDur").value||"—",reason:$("#cReason").value,status:"In progress",notes:$("#cNotes").value});
+    save();closeModal();toast("Intervention recorded");
+    if(activeView==="interventions")RENDER.interventions();
+  };
+}
+
+/* ---- 4. Support tracking ---- */
+RENDER.support=function(){
+  const el=$("#view-support");
+  const c30=daysAgo(30);
+  const recent=DB.support.filter(s=>s.date>=c30);
+  const byTeacher={};DB.support.forEach(s=>{byTeacher[s.teacher]=(byTeacher[s.teacher]||0)+1;});
+  const teacherRows=Object.entries(byTeacher).sort((a,b)=>b[1]-a[1]);
+  const byReason={};recent.forEach(s=>{byReason[s.reason]=(byReason[s.reason]||0)+1;});
+  const topReasons=Object.entries(byReason).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  // weekly trend last 8 weeks
+  const weeks=[];for(let w=7;w>=0;w--){const start=daysAgo(w*7+6),end=daysAgo(w*7);weeks.push({label:"wk "+(8-w),count:DB.support.filter(s=>s.date>=start&&s.date<=end).length});}
+  el.innerHTML=`
+   <div class="page-head"><h2>Teacher behavior support</h2><p>How often classrooms call for the Behavior Team — a signal for coaching and staffing, not blame.</p></div>
+   <div class="grid g-4" style="margin-bottom:18px">
+     <div class="stat"><div class="rail"></div><div class="k">Requests (30d)</div><div class="v">${recent.length}</div></div>
+     <div class="stat"><div class="rail"></div><div class="k">This week</div><div class="v">${DB.support.filter(s=>s.date>=daysAgo(7)).length}</div></div>
+     <div class="stat green"><div class="rail"></div><div class="k">Avg response</div><div class="v">${avgResponse()}<span style="font-size:14px"> min</span></div></div>
+     <div class="stat amber"><div class="rail"></div><div class="k">All-time</div><div class="v">${DB.support.length}</div></div>
+   </div>
+   <div class="two">
+     <div class="card"><div class="card-head"><h3>Requests by classroom</h3><span class="hint">all-time</span></div>
+       <div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Teacher</th><th>Requests</th><th>Share</th></tr></thead><tbody>
+       ${teacherRows.map(([t,n])=>{const max=teacherRows[0][1];return `<tr><td><b>${esc(t)}</b></td><td class="num">${n}</td>
+         <td><div style="height:8px;width:120px;background:var(--paper);border-radius:6px;overflow:hidden"><div style="height:100%;width:${Math.round(n/max*100)}%;background:var(--teal)"></div></div></td></tr>`;}).join("")}
+       </tbody></table></div></div>
+     <div class="card card-pad"><h3 style="font-size:15px;margin-bottom:4px">8‑week trend</h3><p style="color:var(--muted);font-size:12.5px;margin:0 0 10px">Support requests per week</p>
+       <canvas id="supTrend" height="150"></canvas>
+       <h4 style="font-size:13px;margin:18px 0 8px">Top reasons (30d)</h4>
+       ${topReasons.length?topReasons.map(([r,n])=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:1px solid var(--line)"><span>${esc(r)}</span><span class="num">${n}</span></div>`).join(""):'<div class="mm" style="color:var(--muted)">No requests logged in the last 30 days.</div>'}
+     </div>
+   </div>
+   <div class="card" style="margin-top:16px"><div class="card-head"><h3>Recent support log</h3></div>
+     <div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Date</th><th>Student</th><th>Teacher</th><th>Reason</th><th>Responder</th><th>Outcome</th></tr></thead><tbody>
+     ${DB.support.slice(0,15).map(s=>`<tr><td>${fmtDateShort(s.date)} · ${s.time}</td><td><b>${esc(s.studentName)}</b></td><td>${esc(s.teacher)}</td><td>${esc(s.reason)}</td><td>${esc(s.responder)}</td><td>${esc(s.outcome)}</td></tr>`).join("")}
+     </tbody></table></div></div>`;
+  drawLine("supTrend",weeks.map(w=>w.label),weeks.map(w=>w.count),"Requests");
+};
+function avgResponse(){
+  const times=DB.support.filter(s=>s.arrived&&s.time).map(s=>{const a=s.arrived.split(":").map(Number),b=s.time.split(":").map(Number);return (a[0]*60+a[1])-(b[0]*60+b[1]);}).filter(x=>x>0&&x<60);
+  return times.length?Math.round(times.reduce((a,b)=>a+b,0)/times.length):"—";
+}
+
+/* ---- 5. Monthly dashboard ---- */
+RENDER.monthly=function(){
+  const el=$("#view-monthly");
+  const inc=within(30), prev=DB.incidents.filter(i=>i.date>=daysAgo(60)&&i.date<daysAgo(30));
+  const byGrade=tally(inc,"grade"), byCat=tally(inc,"category"), byLoc=tally(inc,"location");
+  const byTime={};inc.forEach(i=>{const b=timeBucket(i.time);byTime[b]=(byTime[b]||0)+1;});
+  const timeOrder=["Before 9am","9–11am","11am–1pm","1–3pm","After 3pm"];
+  // per-day for last 30
+  const days=[];for(let d=29;d>=0;d--){const ds=daysAgo(d);days.push({d:ds,n:inc.filter(i=>i.date===ds).length});}
+  const perDay=(inc.length/30).toFixed(1);
+  const topStudents=Object.entries(tallyObj(inc,"studentName")).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const change=inc.length-prev.length;
+  el.innerHTML=`
+   <div class="page-head" style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px">
+     <div><h2>Monthly behavior dashboard</h2><p>Last 30 days · for staff data meetings.</p></div>
+     <button class="btn" onclick="window.print()">${svg('M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z')} Print / PDF</button>
+   </div>
+   <div class="grid g-4" style="margin-bottom:18px">
+     <div class="stat"><div class="rail"></div><div class="k">Total incidents</div><div class="v">${inc.length}</div><div class="d ${change>0?"trend-up":change<0?"trend-down":"trend-flat"}">${change>0?"▲ +"+change:change<0?"▼ "+change:"– no change"} vs prior 30</div></div>
+     <div class="stat green"><div class="rail"></div><div class="k">Avg / school day</div><div class="v">${perDay}</div></div>
+     <div class="stat amber"><div class="rail"></div><div class="k">Support calls</div><div class="v">${DB.support.filter(s=>s.date>=daysAgo(30)).length}</div></div>
+     <div class="stat red"><div class="rail"></div><div class="k">Serious+ (Sev 3–4)</div><div class="v">${inc.filter(i=>i.severity>=3).length}</div></div>
+   </div>
+   <div class="card card-pad" style="margin-bottom:16px"><h3 style="font-size:15px;margin-bottom:12px">Daily incident trend</h3><canvas id="mTrend" height="90"></canvas></div>
+   <div class="grid g-2" style="margin-bottom:16px">
+     <div class="card card-pad"><h3 style="font-size:15px;margin-bottom:12px">Incidents by grade</h3><canvas id="mGrade" height="150"></canvas></div>
+     <div class="card card-pad"><h3 style="font-size:15px;margin-bottom:12px">By time of day</h3><canvas id="mTime" height="150"></canvas></div>
+   </div>
+   <div class="grid g-2">
+     <div class="card card-pad"><h3 style="font-size:15px;margin-bottom:12px">Most common behaviors</h3>
+       ${Object.entries(byCat).sort((a,b)=>b[1]-a[1]).slice(0,7).map(([c,n])=>{const max=Math.max(...Object.values(byCat));return`<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:3px"><span>${esc(c)}</span><span class="num">${n}</span></div><div style="height:7px;background:var(--paper);border-radius:5px;overflow:hidden"><div style="height:100%;width:${Math.round(n/max*100)}%;background:var(--teal)"></div></div></div>`;}).join("")}
+     </div>
+     <div class="card card-pad"><h3 style="font-size:15px;margin-bottom:6px">Students needing continued support</h3>
+       <p style="color:var(--muted);font-size:12px;margin:0 0 12px">Highest incident counts this month — candidates for proactive check-ins.</p>
+       ${topStudents.map(([n,c])=>`<div class="mini-row" style="cursor:pointer" data-name="${esc(n)}"><div class="av">${initials(n)}</div><div style="flex:1"><div class="mn">${esc(n)}</div></div><span class="pill s${c>=5?4:c>=3?3:2}">${c} incidents</span></div>`).join("")}
+       <h4 style="font-size:13px;margin:16px 0 8px">Top locations</h4>
+       ${Object.entries(byLoc).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([l,n])=>`<span class="tag">${esc(l)} · ${n}</span>`).join("")}
+     </div>
+   </div>`;
+  drawLine("mTrend",days.map(d=>fmtDateShort(d.d)),days.map(d=>d.n),"Incidents",true);
+  drawBar("mGrade",Object.keys(byGrade),Object.values(byGrade),"Incidents");
+  drawBar("mTime",timeOrder,timeOrder.map(t=>byTime[t]||0),"Incidents",["#8ec7bd","#4fb3a2","#0d7d6e","#e2952a","#e8721c"]);
+  $$("#view-monthly [data-name]").forEach(r=>r.onclick=()=>{const s=DB.students.find(x=>x.name===r.dataset.name);if(s)openStudent(s.id);});
+};
+function tally(arr,key){const o={};arr.forEach(x=>o[x[key]]=(o[x[key]]||0)+1);const sorted={};Object.keys(o).sort().forEach(k=>sorted[k]=o[k]);return sorted;}
+function tallyObj(arr,key){const o={};arr.forEach(x=>o[x[key]]=(o[x[key]]||0)+1);return o;}
+
+/* ---- 6. Classroom risk ---- */
+RENDER.risk=function(){
+  const el=$("#view-risk");
+  const stats=classroomStats(30);
+  const counts={g:0,y:0,o:0,r:0};stats.forEach(s=>counts[s.level]++);
+  const legend=[["r","Critical","Immediate intervention"],["o","High concern","Increased support needed"],["y","Moderate","Monitor regularly"],["g","Low concern","Healthy environment"]];
+  el.innerHTML=`
+   <div class="page-head"><h2>Classroom behavior risk</h2><p>Live status from the last 30 days of data. Use it to send support where it’s needed most.</p></div>
+   <div class="grid g-4" style="margin-bottom:20px">
+     ${legend.map(([lv,name,desc])=>`<div class="stat ${lv==="r"?"red":lv==="o"?"amber":lv==="g"?"green":""}"><div class="rail" style="background:var(--${LEVEL_FULL[lv]})"></div><div class="k">${name}</div><div class="v">${counts[lv]}</div><div class="d">${desc}</div></div>`).join("")}
+   </div>
+   <div class="risk-grid">
+     ${stats.map(r=>`<div class="risk-card ${r.level}">
+       <div class="band"><div class="lv"><span class="dot" style="background:#fff"></span>${LEVEL_LABEL[r.level]}</div><div class="score">${r.score}</div></div>
+       <div class="body">
+         <div class="rm">${esc(r.teacher)}</div>
+         <div class="sub">Grade ${r.grade} · ${esc(r.room)} · trend: <b class="${r.trend==="Worsening"?"trend-up":r.trend==="Improving"?"trend-down":"trend-flat"}">${r.trend}</b></div>
+         <div class="risk-metrics">
+           <div><div class="rk">Incidents</div><div class="rv">${r.incidents}</div></div>
+           <div><div class="rk">Support calls</div><div class="rv">${r.calls}</div></div>
+           <div><div class="rk">Office referrals</div><div class="rv">${r.referrals}</div></div>
+           <div><div class="rk">Suspensions</div><div class="rv">${r.suspensions}</div></div>
+         </div>
+       </div>
+     </div>`).join("")}
+   </div>
+   <p style="color:var(--muted);font-size:12px;margin-top:18px">Risk score = incidents + (2 × support calls) + (2 × office referrals) + (4 × suspensions), over 30 days. Thresholds: 5 / 12 / 22.</p>`;
+};
+
+/* ---- 7. Search & reports ---- */
+let searchState={q:"",grade:"",sev:"",cat:"",from:daysAgo(60),to:todayStr()};
+RENDER.search=function(){
+  const el=$("#view-search");
+  el.innerHTML=`
+   <div class="page-head"><h2>Search & reporting</h2><p>Filter every record, then export for meetings, conferences, or district reporting.</p></div>
+   <div class="card card-pad" style="margin-bottom:16px">
+     <div class="grid g-4">
+       <div class="field"><label>Keyword</label><input type="text" id="fq" placeholder="Student, note…" value="${esc(searchState.q)}"/></div>
+       <div class="field"><label>Grade</label><select id="fg"><option value="">Any</option>${[...new Set(DB.students.map(s=>s.grade))].sort().map(g=>`<option ${searchState.grade===g?"selected":""}>${g}</option>`).join("")}</select></div>
+       <div class="field"><label>Severity</label><select id="fs"><option value="">Any</option>${[1,2,3,4].map(n=>`<option value="${n}" ${searchState.sev==n?"selected":""}>${SEV[n]}</option>`).join("")}</select></div>
+       <div class="field"><label>Behavior</label><select id="fc"><option value="">Any</option>${CATEGORIES.map(c=>`<option ${searchState.cat===c?"selected":""}>${esc(c)}</option>`).join("")}</select></div>
+       <div class="field"><label>From</label><input type="date" id="ff" value="${searchState.from}"/></div>
+       <div class="field"><label>To</label><input type="date" id="ft" value="${searchState.to}"/></div>
+       <div class="field" style="align-self:end"><button class="btn primary" style="width:100%" id="runSearch">${svg('M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z')} Search</button></div>
+       <div class="field" style="align-self:end"><button class="btn" style="width:100%" id="resetSearch">Reset</button></div>
+     </div>
+   </div>
+   <div class="card">
+     <div class="card-head"><h3>Results</h3><span class="hint" id="resCount"></span>
+       <div style="margin-left:auto;display:flex;gap:8px">
+         <button class="btn sm" id="expCsv">${svg('M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3')} Export CSV</button>
+         <button class="btn sm" onclick="window.print()">${svg('M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z')} Print</button>
+       </div>
+     </div>
+     <div style="overflow-x:auto"><table class="tbl" id="resTbl"></table></div>
+   </div>`;
+  const run=()=>{
+    searchState={q:$("#fq").value,grade:$("#fg").value,sev:$("#fs").value,cat:$("#fc").value,from:$("#ff").value,to:$("#ft").value};
+    renderResults();
+  };
+  $("#runSearch").onclick=run;
+  $("#resetSearch").onclick=()=>{searchState={q:"",grade:"",sev:"",cat:"",from:daysAgo(60),to:todayStr()};RENDER.search();};
+  $("#expCsv").onclick=exportCsv;
+  renderResults();
+};
+function filteredIncidents(){
+  const s=searchState;
+  return DB.incidents.filter(i=>{
+    if(s.from&&i.date<s.from)return false;
+    if(s.to&&i.date>s.to)return false;
+    if(s.grade&&i.grade!==s.grade)return false;
+    if(s.sev&&i.severity!=s.sev)return false;
+    if(s.cat&&i.category!==s.cat)return false;
+    if(s.q){const q=s.q.toLowerCase();if(!(i.studentName.toLowerCase().includes(q)||(i.description||"").toLowerCase().includes(q)||i.teacher.toLowerCase().includes(q)))return false;}
+    return true;
+  });
+}
+function renderResults(){
+  const list=filteredIncidents();
+  $("#resCount").textContent=list.length+" record"+(list.length===1?"":"s");
+  $("#resTbl").innerHTML=`<thead><tr><th>Date</th><th>Student</th><th>Gr</th><th>Behavior</th><th>Sev</th><th>Location</th><th>Teacher</th></tr></thead><tbody>`+
+   (list.length?list.slice(0,200).map(i=>`<tr class="clickable" data-id="${i.student}"><td>${fmtDateShort(i.date)}</td><td><b>${esc(i.studentName)}</b></td><td>${i.grade}</td><td>${esc(i.category)}</td><td><span class="pill s${i.severity}">${SEV[i.severity]}</span></td><td>${esc(i.location)}</td><td>${esc(i.teacher)}</td></tr>`).join("")
+   :`<tr><td colspan="7" class="empty">No records match these filters.</td></tr>`)+`</tbody>`;
+  $$("#resTbl tr.clickable").forEach(r=>r.onclick=()=>openStudent(r.dataset.id));
+}
+function exportCsv(){
+  const list=filteredIncidents();
+  if(!list.length){toast("Nothing to export");return;}
+  const cols=["date","time","studentName","grade","room","teacher","category","severity","location","supportRequested","immediateAction","description"];
+  const head=cols.join(",");
+  const rows=list.map(i=>cols.map(c=>{let v=c==="severity"?SEV[i.severity]:i[c];v=String(v??"").replace(/"/g,'""');return `"${v}"`;}).join(","));
+  const csv=[head,...rows].join("\n");
+  const blob=new Blob([csv],{type:"text/csv"});const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");a.href=url;a.download="bultum-behavior-export-"+todayStr()+".csv";a.click();URL.revokeObjectURL(url);
+  toast(list.length+" records exported");
+}
+
+/* ---- 8. Admin overview ---- */
+RENDER.admin=function(){
+  const el=$("#view-admin");
+  const inc30=within(30);
+  const multi=Object.entries(tallyObj(within(60),"studentName")).filter(([,n])=>n>=3).length;
+  const stats=classroomStats(30);
+  const alerts=stats.filter(s=>s.level==="r"||s.level==="o");
+  const months=[];for(let m=5;m>=0;m--){const d=new Date();d.setMonth(d.getMonth()-m);const y=d.getFullYear(),mo=d.getMonth();const label=d.toLocaleDateString("en-US",{month:"short"});const n=DB.incidents.filter(i=>{const di=new Date(i.date+"T00:00:00");return di.getFullYear()===y&&di.getMonth()===mo;}).length;months.push({label,n});}
+  el.innerHTML=`
+   <div class="page-head"><h2>Administrative overview</h2><p>School-wide climate at a glance · District 4295‑07.</p></div>
+   <div class="grid g-4" style="margin-bottom:18px">
+     <div class="stat"><div class="rail"></div><div class="k">Incidents (30d)</div><div class="v">${inc30.length}</div></div>
+     <div class="stat red"><div class="rail"></div><div class="k">Active alerts</div><div class="v">${alerts.length}</div><div class="d">classrooms high/critical</div></div>
+     <div class="stat amber"><div class="rail"></div><div class="k">Students w/ 3+ referrals</div><div class="v">${multi}</div></div>
+     <div class="stat"><div class="rail"></div><div class="k">Suspensions (ISS/OSS)</div><div class="v">${DB.consequences.filter(c=>c.type.includes("Suspension")).length}</div></div>
+   </div>
+   <div class="two">
+     <div class="card card-pad"><h3 style="font-size:15px;margin-bottom:12px">Incidents by month</h3><canvas id="aMonths" height="120"></canvas>
+       <div class="grid g-3" style="margin-top:18px">
+         <div><div class="k" style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase">Office referrals</div><div class="num" style="font-size:22px">${DB.consequences.filter(c=>c.type.includes("Referral")).length}</div></div>
+         <div><div class="k" style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase">Support calls (30d)</div><div class="num" style="font-size:22px">${DB.support.filter(s=>s.date>=daysAgo(30)).length}</div></div>
+         <div><div class="k" style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase">Parent contacts</div><div class="num" style="font-size:22px">${DB.consequences.filter(c=>c.type.includes("Parent")).length}</div></div>
+       </div>
+     </div>
+     <div class="card"><div class="card-head"><h3>Classrooms needing attention</h3><button class="btn sm" style="margin-left:auto" onclick="go('risk')">View all</button></div>
+       ${alerts.length?alerts.map(a=>`<div class="mini-row" style="padding:11px 16px"><span class="dot" style="background:var(--${LEVEL_FULL[a.level]})"></span><div style="flex:1"><div class="mn">${esc(a.teacher)}</div><div class="mm">Gr ${a.grade} · ${esc(a.room)} · ${a.trend}</div></div><span class="pill ${a.level==="r"?"s4":"s3"}">Score ${a.score}</span></div>`).join(""):`<div class="empty">No classrooms flagged — nice.</div>`}
+     </div>
+   </div>
+   <div class="card" style="margin-top:16px"><div class="card-head"><h3>Data tools</h3></div>
+     <div class="card-pad" style="display:flex;gap:12px;flex-wrap:wrap">
+       <button class="btn" onclick="go('search')">${svg('M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z')} Open search & export</button>
+       <button class="btn" onclick="window.print()">${svg('M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z')} Print this dashboard</button>
+       <button class="btn danger" onclick="resetData()">Reset demo data</button>
+     </div>
+   </div>`;
+  drawBar("aMonths",months.map(m=>m.label),months.map(m=>m.n),"Incidents");
+};
+/* ---- Big Picture Report ---- */
+RENDER.report=function(){
+  const el=$("#view-report");
+  const inc=within(30), prev=DB.incidents.filter(i=>i.date>=daysAgo(60)&&i.date<daysAgo(30));
+  const change=inc.length-prev.length;
+  const pct=prev.length?Math.round(change/prev.length*100):(inc.length?100:0);
+  const sevCount={1:0,2:0,3:0,4:0}; inc.forEach(i=>sevCount[i.severity]++);
+  const byCat=tallyObj(inc,"category");
+  const topCats=Object.entries(byCat).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const byGrade=tally(inc,"grade");
+  const byTime={}; inc.forEach(i=>{const b=timeBucket(i.time);byTime[b]=(byTime[b]||0)+1;});
+  const timeOrder=["Before 9am","9–11am","11am–1pm","1–3pm","After 3pm"];
+  const stats=classroomStats(30);
+  const rc={g:0,y:0,o:0,r:0}; stats.forEach(s=>rc[s.level]++);
+  const attention=stats.filter(s=>s.level==="r"||s.level==="o");
+  const days=[],dayLabels=[];for(let d=29;d>=0;d--){const ds=daysAgo(d);days.push(inc.filter(i=>i.date===ds).length);dayLabels.push(fmtDateShort(ds));}
+  const perDay=(inc.length/30).toFixed(1);
+  const support30=DB.support.filter(s=>s.date>=daysAgo(30)).length;
+  const serious=inc.filter(i=>i.severity>=3).length;
+  const byLoc=tallyObj(inc,"location");
+  const topLoc=Object.entries(byLoc).sort((a,b)=>b[1]-a[1]).slice(0,4);
+  const topStudents=Object.entries(tallyObj(inc,"studentName")).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const topBehavior=topCats[0]?topCats[0][0]:"—";
+  const gen=new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"});
+  const summary=`Staff logged <b>${inc.length} incidents</b> over the last 30 days — ${change===0?"level with":(change>0?"up ":"down ")+Math.abs(pct)+"% from"} the prior month — averaging <b>${perDay}</b> per school day. The most common behavior was <b>${esc(topBehavior)}</b>. <b>${attention.length}</b> classroom${attention.length===1?"":"s"} ${attention.length===1?"is":"are"} flagged for added support; <b>${rc.g}</b> ${rc.g===1?"is":"are"} in a healthy range.`;
+
+  el.innerHTML=`
+   <div class="toolbar" style="justify-content:flex-end;margin-bottom:14px">
+     <button class="btn" onclick="go('search')">${svg('M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z')} Open underlying data</button>
+     <button class="btn primary" onclick="window.print()">${svg('M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z')} Print / Save as PDF</button>
+   </div>
+   <div class="report">
+     <div style="background:linear-gradient(135deg,#0a5f54 0%,#0d7d6e 55%,#12a48f 100%);color:#fff;border-radius:16px;padding:26px 28px;margin-bottom:20px;box-shadow:var(--shadow)">
+       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">
+         <div>
+           <div style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;opacity:.82;font-weight:600">Bultum Academy · Behavior Report</div>
+           <h2 style="color:#fff;font-size:30px;margin:6px 0 4px;letter-spacing:-.02em">Big picture overview</h2>
+           <div style="opacity:.85;font-size:13.5px">Last 30 days · generated ${gen}</div>
+         </div>
+         <div class="mark" style="width:52px;height:52px;font-size:26px;border-radius:14px">B</div>
+       </div>
+       <div style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:14px 16px;margin-top:18px;font-size:14px;line-height:1.55">${summary}</div>
+     </div>
+
+     <div class="grid g-4" style="margin-bottom:18px">
+       <div class="stat"><div class="rail"></div><div class="k">Incidents (30d)</div><div class="v">${inc.length}</div><div class="d ${change>0?"trend-up":change<0?"trend-down":"trend-flat"}">${change>0?"▲ +"+change:change<0?"▼ "+change:"– no change"} vs prior 30</div></div>
+       <div class="stat green"><div class="rail"></div><div class="k">Avg / school day</div><div class="v">${perDay}</div></div>
+       <div class="stat amber"><div class="rail"></div><div class="k">Support calls</div><div class="v">${support30}</div></div>
+       <div class="stat red"><div class="rail"></div><div class="k">Serious+ (Sev 3–4)</div><div class="v">${serious}</div></div>
+     </div>
+
+     <div class="card card-pad" style="margin-bottom:16px">
+       <h3 style="font-size:15px;margin-bottom:12px">Daily incident trend</h3>
+       <canvas id="rTrend" height="86"></canvas>
+     </div>
+
+     <div class="grid g-2" style="margin-bottom:16px">
+       <div class="card card-pad"><h3 style="font-size:15px;margin-bottom:12px">Severity mix</h3><div style="height:210px"><canvas id="rSev"></canvas></div></div>
+       <div class="card card-pad"><h3 style="font-size:15px;margin-bottom:12px">Behavior mix</h3><div style="height:210px"><canvas id="rCat"></canvas></div></div>
+     </div>
+
+     <div class="grid g-2" style="margin-bottom:16px">
+       <div class="card card-pad"><h3 style="font-size:15px;margin-bottom:12px">By grade</h3><canvas id="rGrade" height="150"></canvas></div>
+       <div class="card card-pad"><h3 style="font-size:15px;margin-bottom:12px">By time of day</h3><canvas id="rTime" height="150"></canvas></div>
+     </div>
+
+     <div class="card card-pad" style="margin-bottom:16px">
+       <h3 style="font-size:15px;margin-bottom:4px">Classroom risk distribution</h3>
+       <p style="color:var(--muted);font-size:12.5px;margin:0 0 14px">Across ${stats.length} classrooms, last 30 days</p>
+       <div class="grid g-4" style="margin-bottom:${attention.length?"14px":"0"}">
+         <div style="background:var(--green-tint);border-radius:10px;padding:12px 14px"><div style="font-family:var(--disp);font-weight:700;font-size:26px;color:#12703a">${rc.g}</div><div style="font-size:12px;font-weight:600;color:#12703a">Low concern</div></div>
+         <div style="background:var(--yellow-tint);border-radius:10px;padding:12px 14px"><div style="font-family:var(--disp);font-weight:700;font-size:26px;color:#7a5c00">${rc.y}</div><div style="font-size:12px;font-weight:600;color:#7a5c00">Moderate</div></div>
+         <div style="background:var(--orange-tint);border-radius:10px;padding:12px 14px"><div style="font-family:var(--disp);font-weight:700;font-size:26px;color:#9c4a10">${rc.o}</div><div style="font-size:12px;font-weight:600;color:#9c4a10">High concern</div></div>
+         <div style="background:var(--red-tint);border-radius:10px;padding:12px 14px"><div style="font-family:var(--disp);font-weight:700;font-size:26px;color:#a71f19">${rc.r}</div><div style="font-size:12px;font-weight:600;color:#a71f19">Critical</div></div>
+       </div>
+       ${attention.length?`<div style="display:flex;flex-wrap:wrap;gap:8px">${attention.map(a=>`<span class="tag" style="border-color:var(--${LEVEL_FULL[a.level]})">${esc(a.teacher)} · Gr ${a.grade} · ${a.trend}</span>`).join("")}</div>`:""}
+     </div>
+
+     <div class="grid g-3">
+       <div class="card card-pad"><h3 style="font-size:14px;margin-bottom:10px">Top behaviors</h3>${topCats.map(([c,n])=>rowbar(c,n,topCats[0][1],"var(--teal)")).join("")||emptySm()}</div>
+       <div class="card card-pad"><h3 style="font-size:14px;margin-bottom:10px">Top locations</h3>${topLoc.map(([l,n])=>rowbar(l,n,topLoc[0]?topLoc[0][1]:1,"var(--amber)")).join("")||emptySm()}</div>
+       <div class="card card-pad"><h3 style="font-size:14px;margin-bottom:4px">Students to check in with</h3><p style="color:var(--muted);font-size:11.5px;margin:0 0 10px">Highest counts this month</p>${topStudents.map(([n,c])=>`<div class="mini-row" data-name="${esc(n)}" style="cursor:pointer;padding:8px 4px"><div class="av">${initials(n)}</div><div style="flex:1"><div class="mn" style="font-size:13px">${esc(n)}</div></div><span class="pill s${c>=5?4:c>=3?3:2}">${c}</span></div>`).join("")||emptySm()}</div>
+     </div>
+
+     <div style="text-align:center;color:var(--muted);font-size:11.5px;margin-top:22px">Bultum Academy Charter School · District 4295‑07 · Confidential — for internal use in student support decisions.</div>
+   </div>`;
+
+  drawLine("rTrend",dayLabels,days,"Incidents",true);
+  drawDoughnut("rSev",["Minor","Moderate","Serious","Critical"],[sevCount[1],sevCount[2],sevCount[3],sevCount[4]],["#16a34a","#e0b013","#e8721c","#d6392f"]);
+  drawDoughnut("rCat",topCats.map(c=>c[0]),topCats.map(c=>c[1]),["#0d7d6e","#12a48f","#4fb3a2","#8ec7bd","#e2952a","#e8721c"]);
+  drawBar("rGrade",Object.keys(byGrade),Object.values(byGrade),"Incidents");
+  drawBar("rTime",timeOrder,timeOrder.map(t=>byTime[t]||0),"Incidents",["#8ec7bd","#4fb3a2","#0d7d6e","#e2952a","#e8721c"]);
+  $$("#view-report [data-name]").forEach(r=>r.onclick=()=>{const s=DB.students.find(x=>x.name===r.dataset.name);if(s)openStudent(s.id);});
+};
+function rowbar(label,n,max,color){return `<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:600;margin-bottom:3px"><span>${esc(label)}</span><span class="num">${n}</span></div><div style="height:7px;background:var(--paper);border-radius:5px;overflow:hidden"><div style="height:100%;width:${Math.round(n/(max||1)*100)}%;background:${color}"></div></div></div>`;}
+function emptySm(){return '<div style="color:var(--muted);font-size:12.5px">No data in range.</div>';}
+
+function resetData(){
+  if(!confirm("Reset all data back to the demo set? This clears everything you've entered on this device."))return;
+  localStorage.removeItem(STORE_KEY);DB=load();save();toast("Data reset");go(activeView);renderNav();
+}
+
+/* ============================================================
+   CHART HELPERS (Chart.js)
+   ============================================================ */
+const charts={};
+function baseOpts(){return{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:"#7b8c90",font:{family:"Inter",size:11}}},y:{beginAtZero:true,ticks:{precision:0,color:"#7b8c90",font:{family:"Inter",size:11}},grid:{color:"#eef2f1"}}}};}
+function drawBar(id,labels,data,label,colors){
+  const cv=$("#"+id);if(!cv||!window.Chart)return;if(charts[id])charts[id].destroy();
+  charts[id]=new Chart(cv,{type:"bar",data:{labels,datasets:[{label,data,backgroundColor:colors||"#0d7d6e",borderRadius:6,maxBarThickness:46}]},options:baseOpts()});
+}
+function drawLine(id,labels,data,label,fill){
+  const cv=$("#"+id);if(!cv||!window.Chart)return;if(charts[id])charts[id].destroy();
+  charts[id]=new Chart(cv,{type:"line",data:{labels,datasets:[{label,data,borderColor:"#0d7d6e",backgroundColor:"rgba(13,125,110,.12)",fill:!!fill,tension:.35,pointRadius:labels.length>15?0:3,pointBackgroundColor:"#0d7d6e",borderWidth:2}]},options:baseOpts()});
+}
+function drawDoughnut(id,labels,data,colors){
+  const cv=$("#"+id);if(!cv||!window.Chart)return;if(charts[id])charts[id].destroy();
+  charts[id]=new Chart(cv,{type:"doughnut",data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:2,borderColor:"#fff"}]},options:{responsive:true,maintainAspectRatio:false,cutout:"60%",plugins:{legend:{position:"right",labels:{color:"#3f5257",font:{family:"Inter",size:12},boxWidth:12,padding:9,usePointStyle:true}}}}});
+}
+
+/* ============================================================
+   MODAL / TOAST
+   ============================================================ */
+function modal(html){$("#modal").innerHTML=html;$("#modalBg").classList.add("show");}
+function closeModal(){$("#modalBg").classList.remove("show");}
+$("#modalBg").onclick=e=>{if(e.target.id==="modalBg")closeModal();};
+let toastT;
+function toast(msg){const t=$("#toast");t.innerHTML=svg('M20 6L9 17l-5-5')+"<span>"+esc(msg)+"</span>";t.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),2600);}
+
+/* ============================================================
+   ROLE + BOOT
+   ============================================================ */
+function setRole(r){
+  ROLE=r;
+  $("#userName").textContent=USERS[r].name;$("#userRole").textContent=USERS[r].role;$("#userAv").textContent=USERS[r].init;
+  // if current view not allowed, jump to first allowed
+  const allowed=NAV.filter(n=>n.roles.includes(r));
+  if(!NAV.find(n=>n.id===activeView).roles.includes(r))activeView=allowed[0].id;
+  renderNav();go(activeView);
+}
+$("#roleSel").onchange=e=>setRole(e.target.value);
+
+renderNav();
+go("entry");
+window.closeModal=closeModal;window.go=go;window.openStudent=openStudent;window.addConsequenceFor=addConsequenceFor;
+window.printStudent=printStudent;window.resetData=resetData;
+</script>
+</body>
+</html>
