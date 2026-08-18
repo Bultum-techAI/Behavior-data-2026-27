@@ -3,11 +3,13 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow, noarchive" />
 <title>Bultum Behavior Portal · 2026–2027</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
 <style>
 :root{
   --ink:#16262b;
@@ -258,6 +260,28 @@ input,select,textarea{font-family:var(--body);font-size:15px}
 
 .mobile-nav{display:none}
 
+/* ---------- Auth gate ---------- */
+.gate{position:fixed;inset:0;z-index:300;background:linear-gradient(150deg,#0a5f54 0%,#16262b 60%);display:none;align-items:center;justify-content:center;padding:24px}
+.gate.show{display:flex}
+.gate-card{background:#fff;border-radius:18px;max-width:410px;width:100%;padding:32px;box-shadow:0 30px 70px -20px rgba(0,0,0,.5)}
+.gate-card .mark{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,var(--teal),#12a48f);display:grid;place-items:center;font-family:var(--disp);font-weight:700;color:#fff;font-size:23px;margin-bottom:16px}
+.gate-card h2{font-size:22px;margin-bottom:5px}
+.gate-card p.lead{color:var(--muted);font-size:13.5px;margin:0 0 20px}
+.gate-msg{font-size:13px;padding:10px 12px;border-radius:9px;margin-bottom:14px;display:none}
+.gate-msg.show{display:block}
+.gate-msg.err{background:var(--red-tint);color:#a71f19}
+.gate-msg.ok{background:var(--green-tint);color:#12703a}
+.role-opts{display:flex;flex-direction:column;gap:7px}
+.role-opts button{text-align:left;border:1.5px solid var(--line-strong);background:var(--surface);padding:10px 13px;border-radius:10px;transition:.12s}
+.role-opts button b{display:block;font-size:13.5px;font-weight:600;color:var(--ink)}
+.role-opts button span{font-size:11.5px;color:var(--muted)}
+.role-opts button:hover{border-color:var(--teal)}
+.role-opts button.on{border-color:var(--teal);background:var(--teal-tint)}
+.role-opts button.on b{color:var(--teal-dark)}
+.cloud-badge{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:20px;background:var(--green-tint);color:#12703a}
+.cloud-badge.local{background:var(--amber-tint);color:#7a5c00}
+.cloud-badge .dot{width:7px;height:7px}
+
 @media(max-width:920px){
   .app{grid-template-columns:1fr}
   .sidebar{display:none}
@@ -332,6 +356,33 @@ input,select,textarea{font-family:var(--body);font-size:15px}
   </div>
 </div>
 
+<div class="gate" id="gate">
+  <div class="gate-card">
+    <div class="mark">B</div>
+    <h2 id="gateTitle">Sign in</h2>
+    <p class="lead" id="gateLead">Bultum Behavior Portal · staff access only</p>
+    <div class="gate-msg" id="gateMsg"></div>
+    <div class="field"><label>Your name</label><input type="text" id="gName" placeholder="e.g. Meg Cavalier" autocomplete="name"/></div>
+    <div class="field"><label>I'm signing in as</label>
+      <div class="role-opts" id="roleOpts">
+        <button data-role="teacher" class="on"><b>Teacher</b><span>Log incidents for my class</span></button>
+        <button data-role="behavior"><b>Behavior Team</b><span>Respond, track interventions</span></button>
+        <button data-role="admin"><b>Administrator</b><span>Full reports and dashboards</span></button>
+      </div>
+    </div>
+    <div class="field" id="gradeField"><label>Your classroom</label>
+      <select id="gGrade"><option value="">Select your classroom…</option></select>
+      <div class="help">Used to show your students first. You can still search anyone.</div>
+    </div>
+    <div class="field" id="passField" style="display:none"><label>Staff password</label>
+      <input type="password" id="gPass" placeholder="••••" inputmode="numeric" style="width:100%;border:1px solid var(--line-strong);border-radius:9px;padding:10px 12px"/>
+      <div class="help">Required for Behavior Team and Administrator access.</div>
+    </div>
+    <button class="btn primary" id="gGo" style="width:100%;justify-content:center;margin-top:4px">Enter portal</button>
+    <p style="font-size:11.5px;color:var(--muted);margin:16px 0 0;line-height:1.5">Internal use only. Your name is recorded on every entry you make.</p>
+  </div>
+</div>
+
 <div class="modal-bg" id="modalBg"><div class="modal" id="modal"></div></div>
 <div class="toast" id="toast"></div>
 
@@ -358,6 +409,7 @@ const USERS = {
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const uid=()=>Math.random().toString(36).slice(2,10);
+const newId=()=>(CLOUD&&crypto.randomUUID)?crypto.randomUUID():uid();
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const initials=n=>n.split(/\s+/).map(w=>w[0]).slice(0,2).join("").toUpperCase();
 const fmtDate=d=>new Date(d+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
@@ -368,9 +420,21 @@ const nowTime=()=>new Date().toTimeString().slice(0,5);
 const timeBucket=t=>{const h=+t.slice(0,2);if(h<9)return"Before 9am";if(h<11)return"9–11am";if(h<13)return"11am–1pm";if(h<15)return"1–3pm";return"After 3pm";};
 
 /* ---------- state ---------- */
-let DB=load();
+let DB={students:[],teachers:[],incidents:[],support:[],consequences:[]};
 let ROLE="teacher";
 let activeView="entry";
+let MY_CLASSROOM="";
+
+/* ============================================================
+   CLOUD CONFIG — paste your Supabase project values here.
+   Leave blank to keep running offline on this device only.
+   Settings → API in your Supabase dashboard.
+   ============================================================ */
+const SUPABASE_URL="";
+const SUPABASE_ANON_KEY="";
+
+const CLOUD = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
+let sb=null, ME=null;
 
 function load(){
   try{const raw=localStorage.getItem(STORE_KEY);if(raw)return JSON.parse(raw);}catch(e){}
@@ -378,7 +442,169 @@ function load(){
   try{localStorage.setItem(STORE_KEY,JSON.stringify(seeded));}catch(e){}
   return seeded;
 }
-function save(){try{localStorage.setItem(STORE_KEY,JSON.stringify(DB));}catch(e){toast("Couldn't save — storage may be full");}}
+function save(){
+  if(CLOUD)return; // cloud writes are explicit — see addRecord/updateRecord
+  try{localStorage.setItem(STORE_KEY,JSON.stringify(DB));}catch(e){toast("Couldn't save — storage may be full");}
+}
+
+/* ---------- column mapping (JS field <-> database column) ---------- */
+const MAP={
+  incidents:{table:"incidents",cols:{student:"student_id",studentName:"student_name",grade:"grade",room:"room",teacher:"teacher",
+    date:"occurred_on",time:"occurred_at",location:"location",reporter:"reporter",severity:"severity",category:"category",
+    description:"description",studentResponse:"student_response",staffResponse:"staff_response",supportRequested:"support_requested",
+    immediateAction:"immediate_action",witnesses:"witnesses",followUp:"follow_up",createdBy:"created_by"}},
+  support:{table:"support_requests",cols:{student:"student_id",studentName:"student_name",teacher:"teacher",grade:"grade",room:"room",
+    date:"occurred_on",time:"occurred_at",reason:"reason",responder:"responder",arrived:"arrived_at",outcome:"outcome",createdBy:"created_by"}},
+  consequences:{table:"consequences",cols:{student:"student_id",studentName:"student_name",type:"type",date:"assigned_on",
+    assignedBy:"assigned_by",duration:"duration",reason:"reason",status:"status",notes:"notes",incident:"incident_id",createdBy:"created_by"}},
+  students:{table:"students",cols:{id:"id",name:"name",grade:"grade",room:"room",teacher:"teacher"}},
+  teachers:{table:"staff",cols:{name:"name",grade:"grade",room:"room"}}
+};
+function toRow(kind,obj){
+  const m=MAP[kind].cols,row={};
+  for(const k in m){ if(obj[k]!==undefined) row[m[k]]=obj[k]===""?null:obj[k]; }
+  if(kind!=="students"&&obj.id&&/^[0-9a-f-]{36}$/i.test(obj.id))row.id=obj.id;
+  return row;
+}
+function fromRow(kind,row){
+  const m=MAP[kind].cols,obj={id:row.id};
+  for(const k in m){ obj[k]=row[m[k]]??(k==="severity"?2:""); }
+  if(kind==="incidents"){obj.severity=row.severity||2;obj.supportRequested=!!row.support_requested;}
+  return obj;
+}
+
+/* ---------- cloud read / write ---------- */
+async function cloudLoad(){
+  const [st,sf,inc,sup,con]=await Promise.all([
+    sb.from("students").select("*").eq("active",true),
+    sb.from("staff").select("*"),
+    sb.from("incidents").select("*").order("occurred_on",{ascending:false}).limit(5000),
+    sb.from("support_requests").select("*").order("occurred_on",{ascending:false}).limit(5000),
+    sb.from("consequences").select("*").order("assigned_on",{ascending:false}).limit(5000)
+  ]);
+  const err=[st,sf,inc,sup,con].find(r=>r.error);
+  if(err)throw new Error(err.error.message);
+  return {
+    students:(st.data||[]).map(r=>fromRow("students",r)),
+    teachers:(sf.data||[]).map(r=>fromRow("teachers",r)),
+    incidents:(inc.data||[]).map(r=>fromRow("incidents",r)),
+    support:(sup.data||[]).map(r=>fromRow("support",r)),
+    consequences:(con.data||[]).map(r=>fromRow("consequences",r))
+  };
+}
+async function addRecord(kind,obj){
+  DB[kind].unshift(obj);            // optimistic — screen updates instantly
+  if(!CLOUD){save();return obj;}
+  const {data,error}=await sb.from(MAP[kind].table).insert(toRow(kind,obj)).select().single();
+  if(error){
+    DB[kind]=DB[kind].filter(x=>x!==obj);
+    toast("Not saved: "+error.message);
+    return null;
+  }
+  Object.assign(obj,fromRow(kind,data));
+  return obj;
+}
+async function updateRecord(kind,id,patch){
+  const rec=DB[kind].find(x=>x.id===id);if(rec)Object.assign(rec,patch);
+  if(!CLOUD){save();return;}
+  const row={};const m=MAP[kind].cols;
+  for(const k in patch) if(m[k]) row[m[k]]=patch[k];
+  const {error}=await sb.from(MAP[kind].table).update(row).eq("id",id);
+  if(error)toast("Not saved: "+error.message);
+}
+
+/* ---------- realtime: everyone sees new entries as they land ---------- */
+function subscribeRealtime(){
+  sb.channel("behavior-portal")
+    .on("postgres_changes",{event:"*",schema:"public"},async payload=>{
+      const t=payload.table;
+      const kind = t==="incidents"?"incidents":t==="support_requests"?"support":t==="consequences"?"consequences":t==="students"?"students":null;
+      if(!kind)return;
+      if(payload.eventType==="INSERT"){
+        if(DB[kind].some(x=>x.id===payload.new.id))return;   // our own write
+        DB[kind].unshift(fromRow(kind,payload.new));
+      } else if(payload.eventType==="UPDATE"){
+        const i=DB[kind].findIndex(x=>x.id===payload.new.id);
+        if(i>-1)DB[kind][i]=fromRow(kind,payload.new); else DB[kind].unshift(fromRow(kind,payload.new));
+      } else if(payload.eventType==="DELETE"){
+        DB[kind]=DB[kind].filter(x=>x.id!==payload.old.id);
+      }
+      RENDER[activeView]&&RENDER[activeView]();
+      renderNav();
+    })
+    .subscribe();
+}
+
+/* ============================================================
+   SIGN-IN — name + role. Behavior Team and Admin need the staff
+   password. This gates the screens, not the data; keep the link private.
+   ============================================================ */
+const STAFF_PASSWORD="1555";
+const SESSION_KEY="bultum_behavior_session";
+let gateRole="teacher";
+
+function gateSay(msg,cls){const m=$("#gateMsg");m.className="gate-msg show "+cls;m.textContent=msg;}
+function showGate(){$("#gate").classList.add("show");setTimeout(()=>$("#gName")&&$("#gName").focus(),80);}
+function hideGate(){$("#gate").classList.remove("show");}
+
+function fillClassrooms(){
+  const sel=$("#gGrade");if(!sel)return;
+  const rooms=[...new Set(DB.students.map(s=>s.teacher).filter(Boolean))].sort();
+  const detail={};DB.students.forEach(s=>{if(s.teacher&&!detail[s.teacher])detail[s.teacher]=s;});
+  sel.innerHTML=`<option value="">Select your classroom…</option>`+
+    rooms.map(t=>`<option value="${esc(t)}">${esc(t)} — Grade ${esc(detail[t].grade||"")} ${esc(detail[t].room||"")}</option>`).join("")+
+    `<option value="__other">Not listed / specialist</option>`;
+}
+function wireGate(){
+  $$("#roleOpts button").forEach(b=>b.onclick=()=>{
+    gateRole=b.dataset.role;
+    $$("#roleOpts button").forEach(x=>x.classList.toggle("on",x===b));
+    $("#passField").style.display=gateRole==="teacher"?"none":"block";
+    $("#gradeField").style.display=gateRole==="teacher"?"block":"none";
+    $("#gateMsg").className="gate-msg";
+  });
+  $("#gGo").onclick=enterPortal;
+  ["gName","gPass"].forEach(id=>{const el=$("#"+id);if(el)el.onkeydown=e=>{if(e.key==="Enter")enterPortal();};});
+  fillClassrooms();
+  // return visit — come straight back in
+  try{
+    const prev=JSON.parse(localStorage.getItem(SESSION_KEY)||"null");
+    if(prev&&prev.name){ startSession(prev.name,prev.role,prev.classroom); return; }
+  }catch(e){}
+  showGate();
+}
+function enterPortal(){
+  const name=$("#gName").value.trim();
+  if(name.length<2){gateSay("Please type your name so entries can be attributed.","err");return;}
+  if(gateRole!=="teacher" && $("#gPass").value.trim()!==STAFF_PASSWORD){
+    gateSay("That password isn’t right. Check with an administrator.","err");
+    $("#gPass").value="";$("#gPass").focus();return;
+  }
+  let classroom=gateRole==="teacher"?$("#gGrade").value:"";
+  if(classroom==="__other")classroom="";
+  try{localStorage.setItem(SESSION_KEY,JSON.stringify({name,role:gateRole,classroom}));}catch(e){}
+  startSession(name,gateRole,classroom);
+}
+function startSession(name,role,classroom){
+  ME={name,role,classroom:classroom||""};
+  const label=role==="admin"?"Administrator":role==="behavior"?"Behavior Team":"Teacher";
+  // the person is whoever typed in — same identity across every role view
+  USERS.teacher ={name,role:"Teacher",init:initials(name)};
+  USERS.behavior={name,role:"Behavior Team",init:initials(name)};
+  USERS.admin   ={name,role:"Administrator",init:initials(name)};
+  MY_CLASSROOM=classroom||"";   // used only for filtering; entries keep the typed name
+  hideGate();
+  const sel=$("#roleSel");
+  sel.value=role;
+  sel.disabled=(role==="teacher");   // teachers stay in the teacher view
+  sel.title=role==="teacher"?"Sign out to change role":"";
+  $("#userRole").textContent=label;
+  setRole(role);
+}
+function signOut(){
+  try{localStorage.removeItem(SESSION_KEY);}catch(e){}
+  location.reload();
+}
 
 /* ---------- seed data ---------- */
 function seed(){
@@ -567,7 +793,7 @@ RENDER.entry=function(){
   if(!entryState)resetEntry();
   const s=entryState;
   const myStudents = ROLE==="teacher"
-    ? DB.students.filter(x=>x.teacher===USERS.teacher.name)
+    ? DB.students.filter(x=>!MY_CLASSROOM||x.teacher===MY_CLASSROOM)
     : DB.students;
   el.innerHTML=`
    <div class="page-head"><h2>Quick incident entry</h2><p>Tap through the fields — most reports take 30–60 seconds. Details are optional.</p></div>
@@ -654,25 +880,27 @@ RENDER.entry=function(){
   renderRecent();
 };
 function resetEntry(){entryState={student:null,studentName:"",grade:"",room:"",teacher:"",category:"",severity:0,location:"Classroom",time:nowTime(),description:"",studentResponse:"",staffResponse:"",immediateAction:"",supportRequested:false};}
-function saveIncident(){
+async function saveIncident(){
   const s=entryState;
   if(!s.student){toast("Pick a student first");return;}
   if(!s.category){toast("Choose a behavior");return;}
   if(!s.severity)s.severity=CAT_SEV[s.category]||2;
-  const inc={id:uid(),student:s.student,studentName:s.studentName,grade:s.grade,room:s.room,teacher:s.teacher,
+  const inc={id:newId(),student:s.student,studentName:s.studentName,grade:s.grade,room:s.room,teacher:s.teacher,
     date:todayStr(),time:s.time,location:s.location,reporter:USERS[ROLE].name,severity:s.severity,category:s.category,
     description:s.description,studentResponse:s.studentResponse,staffResponse:s.staffResponse,
     supportRequested:s.supportRequested,immediateAction:s.immediateAction,witnesses:"",followUp:"",createdBy:USERS[ROLE].name};
-  DB.incidents.unshift(inc);
+  const saved=await addRecord("incidents",inc);
+  if(!saved)return;
   if(s.supportRequested){
-    DB.support.unshift({id:uid(),teacher:s.teacher,grade:s.grade,room:s.room,student:s.student,studentName:s.studentName,
-      date:todayStr(),time:s.time,reason:s.category,responder:"Behavior Team",arrived:"",outcome:"Pending response"});
+    await addRecord("support",{id:newId(),teacher:s.teacher,grade:s.grade,room:s.room,student:s.student,studentName:s.studentName,
+      date:todayStr(),time:s.time,reason:s.category,responder:"Behavior Team",arrived:"",outcome:"Pending response",createdBy:ME?ME.name:""});
   }
-  save();resetEntry();RENDER.entry();renderNav();
-  toast("Incident logged"+(s.supportRequested?" · Behavior Team notified":""));
+  const wanted=s.supportRequested;
+  resetEntry();RENDER.entry();renderNav();
+  toast("Incident logged"+(wanted?" · Behavior Team notified":""));
 }
 function renderRecent(){
-  const mine = ROLE==="teacher"?DB.incidents.filter(i=>i.teacher===USERS.teacher.name):DB.incidents;
+  const mine = ROLE==="teacher"?DB.incidents.filter(i=>!MY_CLASSROOM||i.teacher===MY_CLASSROOM):DB.incidents;
   const rows=mine.slice(0,10);
   $("#recentTbl").innerHTML=`<thead><tr><th>Student</th><th>Behavior</th><th>Severity</th><th>When</th><th>Location</th></tr></thead><tbody>`+
    (rows.length?rows.map(i=>`<tr class="clickable" data-id="${i.student}">
@@ -690,7 +918,7 @@ let studentQuery="";
 RENDER.students=function(){
   const el=$("#view-students");
   const list=DB.students
-    .filter(s=>ROLE!=="teacher"||s.teacher===USERS.teacher.name)
+    .filter(s=>ROLE!=="teacher"||!MY_CLASSROOM||s.teacher===MY_CLASSROOM)
     .map(s=>({...s,count:studentIncidents(s.id).length}))
     .filter(s=>s.name.toLowerCase().includes(studentQuery.toLowerCase()))
     .sort((a,b)=>b.count-a.count||a.name.localeCompare(b.name));
@@ -793,8 +1021,9 @@ RENDER.interventions=function(){
      </div>
    </div>`;
   $$("#intSeg button").forEach(b=>b.onclick=()=>{intFilter=b.dataset.f;RENDER.interventions();});
-  $$("#view-interventions [data-done]").forEach(b=>b.onclick=()=>{
-    const c=DB.consequences.find(x=>x.id===b.dataset.done);if(c){c.status="Completed";save();RENDER.interventions();toast("Marked complete");}
+  $$("#view-interventions [data-done]").forEach(b=>b.onclick=async()=>{
+    await updateRecord("consequences",b.dataset.done,{status:"Completed"});
+    RENDER.interventions();toast("Marked complete");
   });
 };
 function addConsequenceFor(studentId){
@@ -815,11 +1044,11 @@ function addConsequenceFor(studentId){
    </div>
    <div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" id="cSave">Save intervention</button></div>
   `);
-  $("#cSave").onclick=()=>{
+  $("#cSave").onclick=async()=>{
     const sid=$("#cStu").value;const stu=DB.students.find(x=>x.id===sid);
-    DB.consequences.unshift({id:uid(),student:sid,studentName:stu.name,type:$("#cType").value,date:$("#cDate").value,
-      assignedBy:USERS[ROLE].name,duration:$("#cDur").value||"—",reason:$("#cReason").value,status:"In progress",notes:$("#cNotes").value});
-    save();closeModal();toast("Intervention recorded");
+    await addRecord("consequences",{id:newId(),student:sid,studentName:stu.name,type:$("#cType").value,date:$("#cDate").value,
+      assignedBy:USERS[ROLE].name,duration:$("#cDur").value||"—",reason:$("#cReason").value,status:"In progress",notes:$("#cNotes").value,createdBy:ME?ME.name:""});
+    closeModal();toast("Intervention recorded");
     if(activeView==="interventions")RENDER.interventions();
   };
 }
@@ -1041,8 +1270,11 @@ RENDER.admin=function(){
    <div class="card" style="margin-top:16px"><div class="card-head"><h3>Data tools</h3></div>
      <div class="card-pad" style="display:flex;gap:12px;flex-wrap:wrap">
        <button class="btn" onclick="go('search')">${svg('M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z')} Open search & export</button>
+       <button class="btn" onclick="importRoster()">${svg('M12 5v14M5 12h14')} Import roster</button>
+       <button class="btn" onclick="staffAccess()">${svg('M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8z')} Staff access</button>
        <button class="btn" onclick="window.print()">${svg('M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z')} Print this dashboard</button>
-       <button class="btn danger" onclick="resetData()">Reset demo data</button>
+       <button class="btn" onclick="signOut()">Switch user</button>
+       ${CLOUD?"":`<button class="btn danger" onclick="resetData()">Reset demo data</button>`}
      </div>
    </div>`;
   drawBar("aMonths",months.map(m=>m.label),months.map(m=>m.n),"Incidents");
@@ -1145,8 +1377,72 @@ function rowbar(label,n,max,color){return `<div style="margin-bottom:8px"><div s
 function emptySm(){return '<div style="color:var(--muted);font-size:12.5px">No data in range.</div>';}
 
 function resetData(){
+  if(CLOUD){toast("Connected to the shared database — reset from Supabase instead");return;}
   if(!confirm("Reset all data back to the demo set? This clears everything you've entered on this device."))return;
   localStorage.removeItem(STORE_KEY);DB=load();save();toast("Data reset");go(activeView);renderNav();
+}
+
+/* ---------- roster import (cloud, admin only) ---------- */
+function importRoster(){
+  modal(`
+   <div class="modal-head"><h3>Import student roster</h3><button class="x" onclick="closeModal()">×</button></div>
+   <div class="modal-body">
+     <p style="color:var(--muted);font-size:13px;margin:0 0 14px">Paste one student per line, comma separated, in this order:<br/>
+     <code style="background:var(--paper);padding:2px 6px;border-radius:5px;font-size:12px">StudentID, Name, Grade, Room, Teacher</code></p>
+     <div class="field"><textarea id="rosterText" style="min-height:200px;font-family:ui-monospace,monospace;font-size:12.5px" placeholder="S1001, Amina Ahmed, 3, Rm 104, Meg Cavalier
+S1002, Yusuf Hassan, 3, Rm 104, Meg Cavalier"></textarea></div>
+     <p style="font-size:11.5px;color:var(--muted)">Existing IDs are updated rather than duplicated. Export the list from your SIS to build this quickly.</p>
+   </div>
+   <div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" id="rosterGo">Import students</button></div>`);
+  $("#rosterGo").onclick=async()=>{
+    const rows=$("#rosterText").value.split("\n").map(l=>l.split(",").map(x=>x.trim())).filter(p=>p.length>=2&&p[0]);
+    if(!rows.length){toast("Nothing to import");return;}
+    const payload=rows.map(p=>({id:p[0],name:p[1],grade:p[2]||"",room:p[3]||"",teacher:p[4]||"",active:true}));
+    if(CLOUD){
+      const {error}=await sb.from("students").upsert(payload);
+      if(error){toast("Import failed: "+error.message);return;}
+      DB.students=(await sb.from("students").select("*").eq("active",true)).data.map(r=>fromRow("students",r));
+      const rooms={};payload.forEach(p=>{if(p.teacher)rooms[p.teacher]={name:p.teacher,grade:p.grade,room:p.room};});
+      await sb.from("staff").upsert(Object.values(rooms),{onConflict:"name",ignoreDuplicates:true});
+      DB.teachers=(await sb.from("staff").select("*")).data.map(r=>fromRow("teachers",r));
+    } else {
+      payload.forEach(p=>{const i=DB.students.findIndex(s=>s.id===p.id);if(i>-1)DB.students[i]=p;else DB.students.push(p);});
+      save();
+    }
+    closeModal();toast(payload.length+" students imported");go(activeView);
+  };
+}
+
+/* ---------- staff access (cloud, admin only) ---------- */
+async function staffAccess(){
+  if(!CLOUD){toast("Connect Supabase to manage staff accounts");return;}
+  const {data,error}=await sb.from("profiles").select("*").order("created_at",{ascending:false});
+  if(error){toast(error.message);return;}
+  modal(`
+   <div class="modal-head"><h3>Staff access</h3><button class="x" onclick="closeModal()">×</button></div>
+   <div class="modal-body">
+     <p style="color:var(--muted);font-size:13px;margin:0 0 14px">New accounts see nothing until you approve them. Role controls what each person can open.</p>
+     <table class="tbl"><thead><tr><th>Name</th><th>Role</th><th>Access</th></tr></thead><tbody>
+     ${(data||[]).map(p=>`<tr>
+       <td><b>${esc(p.full_name)}</b><div style="font-size:11.5px;color:var(--muted)">${esc(p.email||"")}</div></td>
+       <td><select data-role="${p.id}" style="border:1px solid var(--line-strong);border-radius:7px;padding:5px 8px;font-size:12.5px">
+         ${["teacher","behavior","admin"].map(r=>`<option value="${r}" ${p.role===r?"selected":""}>${r==="behavior"?"Behavior Team":r==="admin"?"Administrator":"Teacher"}</option>`).join("")}
+       </select></td>
+       <td><button class="btn sm" data-approve="${p.id}" data-now="${p.approved}">${p.approved?"Revoke":"Approve"}</button></td>
+     </tr>`).join("")}
+     </tbody></table>
+   </div>
+   <div class="modal-foot"><button class="btn primary" onclick="closeModal()">Done</button></div>`);
+  $$("#modal [data-role]").forEach(s=>s.onchange=async()=>{
+    const {error}=await sb.from("profiles").update({role:s.value}).eq("id",s.dataset.role);
+    toast(error?error.message:"Role updated");
+  });
+  $$("#modal [data-approve]").forEach(b=>b.onclick=async()=>{
+    const now=b.dataset.now==="true";
+    const {error}=await sb.from("profiles").update({approved:!now}).eq("id",b.dataset.approve);
+    if(error){toast(error.message);return;}
+    toast(now?"Access revoked":"Access approved");staffAccess();
+  });
 }
 
 /* ============================================================
@@ -1189,10 +1485,32 @@ function setRole(r){
 }
 $("#roleSel").onchange=e=>setRole(e.target.value);
 
-renderNav();
-go("entry");
+async function boot(){
+  const badge=document.createElement("div");
+  badge.className="cloud-badge"+(CLOUD?"":" local");
+  badge.innerHTML=`<span class="dot" style="background:currentColor"></span>${CLOUD?"Shared":"This device only"}`;
+  $(".topbar .spacer").after(badge);
+
+  if(CLOUD){
+    sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{auth:{persistSession:false}});
+    try{ DB=await cloudLoad(); subscribeRealtime(); }
+    catch(e){
+      DB=load();
+      toast("Couldn’t reach the shared database — working offline");
+      console.error(e);
+    }
+  } else {
+    DB=load();
+  }
+  renderNav();
+  go("entry");
+  wireGate();   // shows the gate, or restores a saved session
+}
+boot();
+
 window.closeModal=closeModal;window.go=go;window.openStudent=openStudent;window.addConsequenceFor=addConsequenceFor;
-window.printStudent=printStudent;window.resetData=resetData;
+window.printStudent=printStudent;window.resetData=resetData;window.importRoster=importRoster;
+window.staffAccess=staffAccess;window.signOut=signOut;
 </script>
 </body>
 </html>
