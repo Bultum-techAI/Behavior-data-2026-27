@@ -276,6 +276,8 @@ input,select,textarea{font-family:var(--body);font-size:15px}
   animation:alertIn .3s ease, alertGlow 2.6s ease-in-out infinite}
 @keyframes alertIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
 @keyframes alertGlow{0%,100%{box-shadow:0 6px 18px -8px rgba(214,57,47,.7)}50%{box-shadow:0 6px 26px -6px rgba(232,114,28,.95)}}
+.alert-strip.activity{background:linear-gradient(100deg,#0a5f54 0%,#0d7d6e 50%,#12a48f 100%);box-shadow:0 6px 18px -8px rgba(13,125,110,.7);animation:alertIn .3s ease}
+.alert-strip.activity .abtn:hover{color:var(--teal-dark)}
 .alert-strip .ping{width:11px;height:11px;border-radius:50%;background:#fff;flex:0 0 auto;animation:ping 1.3s ease-in-out infinite}
 @keyframes ping{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(1.5)}}
 .alert-strip .atxt{flex:1;min-width:200px}
@@ -467,7 +469,7 @@ const SUPABASE_URL="https://epuocyziiohbzzaspiec.supabase.co";
 const SUPABASE_ANON_KEY="sb_publishable_JltgV_Do3pKQjrVIUJ14Dw_U8t1X4Iv";
 
 let CLOUD = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
-let sb=null, ME=null;
+let sb=null, ME=null, CLOUD_ERROR=null, RT_STATUS="connecting";
 
 /* Warn clearly if a key is present but the project URL was never filled in,
    rather than silently falling back to demo data. */
@@ -520,9 +522,11 @@ function fromRow(kind,row){
 
 /* ---------- cloud read / write ---------- */
 async function cloudLoad(){
+  // select("*") everywhere, then filter in JS — that way a missing optional
+  // column (from an older schema) can never take the whole load down.
   const [st,sf,inc,sup,con]=await Promise.all([
-    sb.from("students").select("*").eq("active",true),
-    sb.from("staff").select("*").eq("active",true),
+    sb.from("students").select("*"),
+    sb.from("staff").select("*"),
     sb.from("incidents").select("*").order("occurred_on",{ascending:false}).limit(5000),
     sb.from("support_requests").select("*").order("occurred_on",{ascending:false}).limit(5000),
     sb.from("consequences").select("*").order("assigned_on",{ascending:false}).limit(5000)
@@ -530,8 +534,8 @@ async function cloudLoad(){
   const err=[st,sf,inc,sup,con].find(r=>r.error);
   if(err)throw new Error(err.error.message);
   return {
-    students:(st.data||[]).map(r=>fromRow("students",r)),
-    teachers:(sf.data||[]).map(r=>fromRow("teachers",r)),
+    students:(st.data||[]).filter(r=>r.active!==false).map(r=>fromRow("students",r)),
+    teachers:(sf.data||[]).filter(r=>r.active!==false).map(r=>fromRow("teachers",r)),
     incidents:(inc.data||[]).map(r=>fromRow("incidents",r)),
     support:(sup.data||[]).map(r=>fromRow("support",r)),
     consequences:(con.data||[]).map(r=>fromRow("consequences",r))
@@ -559,11 +563,41 @@ async function updateRecord(kind,id,patch){
 }
 
 /* ---------- realtime: everyone sees new entries as they land ---------- */
+let pollTimer=null;
 function subscribeRealtime(){
-  sb.channel("behavior-portal")
-    .on("postgres_changes",{event:"*",schema:"public"},async payload=>{
+  const ch=sb.channel("behavior-portal");
+  ["incidents","support_requests","consequences","students","staff"].forEach(tbl=>{
+    ch.on("postgres_changes",{event:"*",schema:"public",table:tbl},handleChange);
+  });
+  ch.subscribe(status=>{
+    RT_STATUS=status;
+    // If realtime never connects (not enabled, websocket blocked on school
+    // wifi), fall back to polling so notifications still arrive.
+    if(status==="SUBSCRIBED"){ if(pollTimer){clearInterval(pollTimer);pollTimer=null;} }
+    else if(status==="CHANNEL_ERROR"||status==="TIMED_OUT"||status==="CLOSED"){ startPolling(); }
+  });
+  setTimeout(()=>{ if(!pollTimer&&ch.state!=="joined") startPolling(); },8000);
+}
+function startPolling(){
+  if(pollTimer)return;
+  pollTimer=setInterval(refreshFromCloud,45000);
+}
+async function refreshFromCloud(){
+  if(!CLOUD||!sb)return;
+  try{
+    const fresh=await cloudLoad();
+    const changed = fresh.incidents.length!==DB.incidents.length
+                 || fresh.students.length!==DB.students.length
+                 || fresh.consequences.length!==DB.consequences.length;
+    DB=fresh;
+    renderAlerts();renderNav();
+    // don't redraw the entry form out from under someone mid-typing
+    if(changed && activeView!=="entry") RENDER[activeView]&&RENDER[activeView]();
+  }catch(e){ console.warn("Refresh failed",e); }
+}
+function handleChange(payload){
       const t=payload.table;
-      const kind = t==="incidents"?"incidents":t==="support_requests"?"support":t==="consequences"?"consequences":t==="students"?"students":null;
+      const kind = t==="incidents"?"incidents":t==="support_requests"?"support":t==="consequences"?"consequences":t==="students"?"students":t==="staff"?"teachers":null;
       if(!kind)return;
       if(payload.eventType==="INSERT"){
         if(DB[kind].some(x=>x.id===payload.new.id))return;   // our own write
@@ -574,10 +608,8 @@ function subscribeRealtime(){
       } else if(payload.eventType==="DELETE"){
         DB[kind]=DB[kind].filter(x=>x.id!==payload.old.id);
       }
-      RENDER[activeView]&&RENDER[activeView]();
+      if(activeView!=="entry") RENDER[activeView]&&RENDER[activeView]();
       renderNav();renderAlerts();
-    })
-    .subscribe();
 }
 
 /* ============================================================
@@ -816,7 +848,8 @@ function renderNav(){
   });
 }
 function badgeFor(id){
-  if(id==="admin"||id==="interventions"){const r=openRemovals().length;return r?`<span class="badge" style="background:#d6392f;color:#fff">${r}</span>`:"";}
+  if(id==="admin"||id==="interventions"){const r=openRemovals().length;if(r)return `<span class="badge" style="background:#d6392f;color:#fff">${r}</span>`;
+    const n=newActivity().length;return n?`<span class="badge" style="background:var(--teal);color:#fff">${n}</span>`:"";}
   if(id==="risk"){const crit=classroomStats().filter(r=>r.level==="r"||r.level==="o").length;return crit?`<span class="badge">${crit}</span>`:"";}
   if(id==="support"){const open=DB.support.filter(s=>s.date>=daysAgo(7)).length;return open?`<span class="badge">${open}</span>`:"";}
   return "";
@@ -1015,6 +1048,80 @@ function removalConfirm(inc,called){
 }
 
 /* ============================================================
+   CONNECTION CHECK — tests each table and reports exactly what
+   is missing, so setup problems are visible instead of guessed at.
+   ============================================================ */
+const REQUIRED={
+  students:["id","name","grade","room","teacher","active"],
+  staff:["id","name","grade","room","active"],
+  incidents:["id","student_id","student_name","occurred_on","severity","category","removed_from_class","parent_contacted","acknowledged"],
+  support_requests:["id","student_id","occurred_on","reason"],
+  consequences:["id","student_id","type","assigned_on","status"]
+};
+async function connectionCheck(){
+  if(!CLOUD){
+    modal(`<div class="modal-head"><h3>Connection check</h3><button class="x" onclick="closeModal()">×</button></div>
+      <div class="modal-body"><div class="advise" style="margin:0"><div class="advise-head">Not connected</div>
+      <p>No Project URL is set in this file, so everything is saving to this device only.</p></div></div>
+      <div class="modal-foot"><button class="btn primary" onclick="closeModal()">Close</button></div>`);
+    return;
+  }
+  modal(`<div class="modal-head"><h3>Connection check</h3><button class="x" onclick="closeModal()">×</button></div>
+    <div class="modal-body" id="ccBody"><p style="color:var(--muted)">Testing each table…</p></div>
+    <div class="modal-foot"><button class="btn primary" onclick="closeModal()">Close</button></div>`);
+  const rows=[];
+  let allGood=true, needsSchema=false;
+  for(const t in REQUIRED){
+    let status,detail="",ok=false;
+    try{
+      const {data,error}=await sb.from(t).select("*").limit(1);
+      if(error){
+        status="Missing";detail=error.message;allGood=false;needsSchema=true;
+      }else{
+        const cols=data&&data.length?Object.keys(data[0]):null;
+        const missing=cols?REQUIRED[t].filter(c=>!cols.includes(c)):[];
+        if(missing.length){status="Out of date";detail="missing: "+missing.join(", ");allGood=false;needsSchema=true;}
+        else {status="OK";ok=true;detail=cols?"":"empty table — columns verified on first row";}
+      }
+    }catch(e){status="Error";detail=e.message;allGood=false;}
+    rows.push({t,status,detail,ok});
+  }
+  // write test
+  let writeOk=false,writeMsg="";
+  try{
+    const testId="__conncheck_"+Date.now();
+    const {error}=await sb.from("students").insert({id:testId,name:"Connection test",grade:"",room:"",teacher:"",active:false});
+    if(error){writeMsg=error.message;}
+    else{writeOk=true;await sb.from("students").update({active:false}).eq("id",testId);}
+  }catch(e){writeMsg=e.message;}
+  if(!writeOk)allGood=false;
+
+  $("#ccBody").innerHTML=`
+    <div style="margin-bottom:16px;padding:12px 14px;border-radius:10px;background:${allGood?"var(--green-tint)":"var(--red-tint)"};color:${allGood?"#12703a":"#a71f19"};font-weight:600;font-size:14px">
+      ${allGood?"Everything is connected and working.":"Setup is incomplete — see below."}
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;word-break:break-all">${esc(SUPABASE_URL)}</div>
+    <table class="tbl"><thead><tr><th>Table</th><th>Status</th><th>Detail</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr><td><b>${r.t}</b></td>
+      <td><span class="pill ${r.ok?"teal":"s4"}">${r.status}</span></td>
+      <td style="font-size:12px;color:var(--muted)">${esc(r.detail||"—")}</td></tr>`).join("")}
+    <tr><td><b>write access</b></td><td><span class="pill ${writeOk?"teal":"s4"}">${writeOk?"OK":"Blocked"}</span></td>
+      <td style="font-size:12px;color:var(--muted)">${esc(writeMsg||"records can be saved")}</td></tr>
+    <tr><td><b>live sharing</b></td>
+      <td><span class="pill ${RT_STATUS==="SUBSCRIBED"?"teal":pollTimer?"s2":"s4"}">${RT_STATUS==="SUBSCRIBED"?"Instant":pollTimer?"Every 45s":"Connecting"}</span></td>
+      <td style="font-size:12px;color:var(--muted)">${RT_STATUS==="SUBSCRIBED"
+        ? "entries appear on other screens within a second"
+        : pollTimer ? "realtime unavailable — falling back to a refresh every 45 seconds"
+        : "still establishing the live connection"}</td></tr>
+    </tbody></table>
+    ${needsSchema?`<div class="advise" style="margin-top:16px"><div class="advise-head">How to fix</div>
+      <p>Open Supabase → <b>SQL Editor</b> → New query, paste the whole <b>supabase-schema.sql</b> file, and press Run.
+      It is safe to run again over an existing database — it repairs older tables rather than replacing them.
+      Then reload this page.</p></div>`:""}
+    ${CLOUD_ERROR?`<div style="margin-top:14px;font-size:11.5px;color:var(--muted);white-space:pre-wrap">${esc(CLOUD_ERROR)}</div>`:""}`;
+}
+
+/* ============================================================
    SUSPENSION LETTER — follows the Bultum letterhead template,
    with student, behavior specialist, and parent/guardian signatures.
    ============================================================ */
@@ -1183,23 +1290,76 @@ function openLetter(d){
    REMOVAL ALERTS — vibrant banner for Behavior Team & Admin
    ============================================================ */
 function openRemovals(){ return DB.incidents.filter(i=>i.removedFromClass&&!i.acknowledged); }
+
+/* ---- new activity: anything logged by someone else that this
+   admin / behavior user hasn't reviewed yet ---- */
+const SEEN_KEY="bultum_behavior_seen";
+function seenSet(){
+  try{return new Set(JSON.parse(localStorage.getItem(SEEN_KEY)||"[]"));}catch(e){return new Set();}
+}
+function markSeen(ids){
+  const set=seenSet();ids.forEach(i=>set.add(i));
+  const arr=[...set].slice(-800);
+  try{localStorage.setItem(SEEN_KEY,JSON.stringify(arr));}catch(e){}
+}
+function newActivity(){
+  const seen=seenSet(), me=ME?ME.name:"";
+  return DB.incidents.filter(i=>!seen.has(i.id) && i.createdBy!==me && i.date>=daysAgo(2));
+}
+function activityModal(){
+  const list=newActivity().slice(0,40);
+  modal(`
+   <div class="modal-head"><h3>New entries</h3>
+     <div style="font-size:12.5px;color:var(--muted);margin-left:8px">logged by staff in the last 48 hours</div>
+     <button class="x" onclick="closeModal()">×</button></div>
+   <div class="modal-body" style="padding:0">
+     ${list.length?list.map(i=>`<div class="removal-row" data-open="${i.student}" style="cursor:pointer">
+       <div class="av" style="width:34px;height:34px;border-radius:9px;background:var(--teal-tint);color:var(--teal-dark);display:grid;place-items:center;font-family:var(--disp);font-weight:600;font-size:12px">${initials(i.studentName)}</div>
+       <div class="rl">
+         <div style="font-weight:600;font-size:14px">${esc(i.studentName)} <span style="color:var(--muted);font-weight:500">· Gr ${esc(i.grade)}</span></div>
+         <div style="font-size:12px;color:var(--muted)">${esc(i.category)} · ${esc(i.createdBy||i.teacher)} · ${fmtDateShort(i.date)} ${i.time}</div>
+       </div>
+       <span class="pill s${i.severity}">${SEV[i.severity]}</span>
+       ${i.removedFromClass?`<span class="pill s4">Removed</span>`:""}
+     </div>`).join(""):`<div class="empty">Nothing new.</div>`}
+   </div>
+   <div class="modal-foot"><button class="btn primary" id="seenAll">Mark all as reviewed</button></div>`);
+  $$("#modal [data-open]").forEach(r=>r.onclick=()=>openStudent(r.dataset.open));
+  $("#seenAll").onclick=()=>{markSeen(list.map(i=>i.id));closeModal();renderAlerts();renderNav();toast("Marked as reviewed");};
+}
+
 function renderAlerts(){
   const bar=$("#alertBar");if(!bar)return;
   if(ROLE==="teacher"){bar.innerHTML="";return;}
-  const list=openRemovals();
-  if(!list.length){bar.innerHTML="";return;}
-  const uncalled=list.filter(i=>!i.parentContacted).length;
-  const newest=list[0];
-  bar.innerHTML=`<div class="alert-strip">
-    <span class="ping"></span>
-    <div class="atxt">
-      <b>${list.length===1?"Student removed from class":list.length+" students removed from class"}</b>
-      <span>${esc(newest.studentName)} · Grade ${esc(newest.grade)} · ${esc(newest.teacher)} · ${fmtDateShort(newest.date)} at ${newest.time}${list.length>1?` &nbsp;+${list.length-1} more`:""}</span>
-    </div>
-    ${uncalled?`<span class="nocall">${uncalled} FAMILY CALL${uncalled===1?"":"S"} OUTSTANDING</span>`:""}
-    <button class="abtn" id="alertView">Review</button>
-  </div>`;
-  $("#alertView").onclick=removalsModal;
+  const list=openRemovals(), fresh=newActivity();
+  let html="";
+  if(fresh.length){
+    const newest=fresh[0];
+    html+=`<div class="alert-strip activity">
+      <span class="ping"></span>
+      <div class="atxt">
+        <b>${fresh.length} new ${fresh.length===1?"entry":"entries"} from staff</b>
+        <span>Latest: ${esc(newest.studentName)} · ${esc(newest.category)} · ${esc(newest.createdBy||newest.teacher)} · ${fmtDateShort(newest.date)} ${newest.time}</span>
+      </div>
+      <button class="abtn" id="actView">Review</button>
+    </div>`;
+  }
+  if(list.length){
+    const uncalled=list.filter(i=>!i.parentContacted).length;
+    const rNew=list[0];
+    html+=`<div class="alert-strip">
+      <span class="ping"></span>
+      <div class="atxt">
+        <b>${list.length===1?"Student removed from class":list.length+" students removed from class"}</b>
+        <span>${esc(rNew.studentName)} · Grade ${esc(rNew.grade)} · ${esc(rNew.teacher)} · ${fmtDateShort(rNew.date)} at ${rNew.time}${list.length>1?` &nbsp;+${list.length-1} more`:""}</span>
+      </div>
+      ${uncalled?`<span class="nocall">${uncalled} FAMILY CALL${uncalled===1?"":"S"} OUTSTANDING</span>`:""}
+      <button class="abtn" id="alertView">Review</button>
+    </div>`;
+  }
+  bar.innerHTML=html;
+  const av=$("#actView"); if(av)av.onclick=activityModal;
+  const rv=$("#alertView"); if(rv)rv.onclick=removalsModal;
 }
 function removalsModal(){
   const list=openRemovals();
@@ -1612,6 +1772,7 @@ RENDER.admin=function(){
        <button class="btn" onclick="go('search')">${svg('M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z')} Open search & export</button>
        <button class="btn" onclick="go('roster')">${svg('M12 5v14M5 12h14')} Manage roster</button>
        <button class="btn" onclick="suspensionLetter()">${svg('M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8')} Suspension letter</button>
+       <button class="btn" onclick="connectionCheck()">${svg('M12 2a10 10 0 100 20 10 10 0 000-20zM12 8v4M12 16h.01')} Connection check</button>
        <button class="btn" onclick="window.print()">${svg('M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z')} Print this dashboard</button>
        <button class="btn" onclick="signOut()">Switch user</button>
        ${CLOUD?"":`<button class="btn danger" onclick="resetData()">Reset demo data</button>`}
@@ -1948,14 +2109,13 @@ async function boot(){
     catch(e){
       DB=load();
       const m=(e.message||"").toLowerCase();
-      if(m.includes("does not exist")||m.includes("relation"))
-        toast("Connected, but tables are missing — run supabase-schema.sql first");
-      else if(m.includes("api key")||m.includes("jwt")||m.includes("unauthorized"))
-        toast("Key rejected — check the publishable key in Settings → API");
-      else if(m.includes("fetch")||m.includes("network"))
-        toast("Can’t reach that Project URL — check it for typos");
-      else
-        toast("Couldn’t load shared data: "+(e.message||"unknown error"));
+      let why="Couldn’t load shared data: "+(e.message||"unknown error");
+      if(m.includes("column"))            why="Your database is on an older version — re-run supabase-schema.sql to update it";
+      else if(m.includes("relation")||m.includes("does not exist")) why="Tables are missing — run supabase-schema.sql in the SQL Editor";
+      else if(m.includes("api key")||m.includes("jwt")||m.includes("unauthorized")) why="Key rejected — check the publishable key in Settings → API";
+      else if(m.includes("fetch")||m.includes("network")) why="Can’t reach that Project URL — check it for typos";
+      CLOUD_ERROR=why+"\n\nTechnical detail: "+(e.message||"");
+      toast(why);
       console.error("Supabase connection failed:",e);
     }
   } else {
@@ -1972,7 +2132,7 @@ boot();
 window.closeModal=closeModal;window.go=go;window.openStudent=openStudent;window.addConsequenceFor=addConsequenceFor;
 window.printStudent=printStudent;window.resetData=resetData;window.signOut=signOut;
 window.addStudent=addStudent;window.addTeacher=addTeacher;
-window.suspensionLetter=suspensionLetter;window.removalsModal=removalsModal;window.renderAlerts=renderAlerts;
+window.suspensionLetter=suspensionLetter;window.connectionCheck=connectionCheck;window.removalsModal=removalsModal;window.renderAlerts=renderAlerts;
 </script>
 </body>
 </html>
