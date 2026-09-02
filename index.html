@@ -283,6 +283,47 @@ input,select,textarea{font-family:var(--body);font-size:15px}
 .mobile-nav{display:none}
 
 
+/* ---------- Quick Entry: strikes + door duty ---------- */
+.strike-panel{margin-top:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:14px 15px}
+.sp-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:11px;flex-wrap:wrap}
+.sp-head b{font-family:var(--disp);font-size:14px;font-weight:600}
+.sp-head span{font-size:11.5px;color:var(--muted)}
+.sp-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.sp-box{border:1.5px solid var(--line-strong);border-radius:11px;padding:11px 12px;background:var(--paper)}
+.sp-box.some{border-color:var(--yellow);background:var(--yellow-tint)}
+.sp-box.over{border-color:var(--red);background:var(--red-tint)}
+.sp-k{font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;font-weight:700;color:var(--muted)}
+.sp-box.over .sp-k{color:#a71f19}
+.sp-v{font-family:var(--disp);font-weight:700;font-size:27px;line-height:1.1;margin:2px 0 1px}
+.sp-v small{font-size:13px;font-weight:600;color:var(--muted);margin-left:2px}
+.sp-box.over .sp-v{color:#a71f19}
+.sp-note{font-size:11.5px;color:var(--ink-soft);margin-bottom:9px;min-height:15px}
+.sp-box.over .sp-note{color:#a71f19;font-weight:600}
+.sp-box .btn{width:100%;justify-content:center}
+.sp-ff{display:flex;align-items:center;gap:10px;margin-top:11px;padding:10px 12px;border-radius:10px;flex-wrap:wrap}
+.sp-ff svg{width:18px;height:18px;flex:0 0 auto}
+.sp-ff div{flex:1;min-width:150px}
+.sp-ff b{display:block;font-size:13px}
+.sp-ff span{font-size:11.5px;opacity:.85}
+.sp-ff.ok{background:var(--green-tint);color:#12703a}
+.sp-ff.pending{background:var(--yellow-tint);color:#7a5c00}
+.sp-ff.out{background:var(--red-tint);color:#a71f19}
+.sp-ff .btn{margin-left:auto}
+
+.qe-more.door{margin-bottom:16px}
+.qe-more.door summary svg{width:16px;height:16px;margin-right:8px;color:var(--teal)}
+.door-list{max-height:340px;overflow-y:auto;margin:0 -14px}
+.door-row{display:flex;align-items:center;gap:10px;padding:9px 14px;border-top:1px solid var(--line);flex-wrap:wrap}
+.door-row.out{background:var(--red-tint)}
+.dr-name{flex:1;min-width:150px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.dr-name b{font-size:13.5px;font-weight:600}
+.dr-act{display:flex;gap:7px}
+.dr-btn{border:1.5px solid var(--line-strong);background:var(--surface);border-radius:9px;padding:7px 11px;font-size:12.5px;font-weight:600;color:var(--ink-soft);display:flex;align-items:center;gap:6px}
+.dr-btn b{font-family:var(--disp);font-size:13px;min-width:13px;display:inline-block;text-align:center}
+.dr-btn:hover{border-color:var(--teal);color:var(--teal-dark);background:var(--teal-tint)}
+.dr-btn.maxed{border-color:var(--red);color:#a71f19;background:var(--red-tint)}
+@media(max-width:920px){.sp-grid{grid-template-columns:1fr}.dr-act{width:100%}.dr-btn{flex:1;justify-content:center}}
+
 /* ---------- Weekly tracker ---------- */
 .week-bar{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 16px;box-shadow:var(--shadow)}
 .week-bar .wk{flex:1}
@@ -1221,17 +1262,71 @@ RENDER.entry=function(){
        <div class="qe-clock">${svg('M12 8v4l3 3M12 2a10 10 0 100 20 10 10 0 000-20z')}<span>${nowTime()}</span></div>
      </div>
 
+     <details class="qe-more door" id="doorPanel">
+       <summary>${svg('M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11')} Morning check — mark tardies &amp; uniform for the whole class <span>no form needed</span></summary>
+       <div class="door-list">${(()=>{
+         const ws=mondayOf(todayStr());
+         const roster=DB.students.filter(x=>ROLE!=="teacher"||!MY_CLASSROOM||x.teacher===MY_CLASSROOM)
+           .sort((a,b)=>a.name.localeCompare(b.name));
+         if(!roster.length)return `<div class="empty">No students on your roster yet.</div>`;
+         return roster.map(st=>{
+           const t=tallyFor(st.id,ws), ff=funFridayStatus(st.id);
+           return `<div class="door-row ${ff.out?"out":""}">
+             <div class="dr-name"><b>${esc(st.name)}</b>
+               ${ff.out?`<span class="pill s4">No Fun Friday</span>`:t.tardy||t.uniform?`<span class="pill s2">${t.tardy?t.tardy+"T":""}${t.tardy&&t.uniform?" · ":""}${t.uniform?t.uniform+"U":""}</span>`:""}</div>
+             <div class="dr-act">
+               <button class="dr-btn ${t.tardy>=FF_LIMIT?"maxed":""}" data-qtardy="${st.id}">Tardy <b>${t.tardy}</b></button>
+               <button class="dr-btn ${t.uniform>=FF_LIMIT?"maxed":""}" data-quniform="${st.id}">Uniform <b>${t.uniform}</b></button>
+             </div>
+           </div>`;
+         }).join("");
+       })()}</div>
+       <div style="padding:9px 0 12px;font-size:11.5px;color:var(--muted)">Second tardy or second uniform violation removes the student from Fun Friday automatically. Mis-taps can be undone on the Tardy &amp; Uniform tab.</div>
+     </details>
+
      <!-- STEP 1 -->
      <section class="qe-step ${s.student?"filled":""}">
        <div class="qe-num">1</div>
        <div class="qe-body">
          <h3>Who</h3>
-         ${s.student?`
+         ${s.student?(()=>{
+           const ws=mondayOf(todayStr());
+           const t=tallyFor(s.student,ws);
+           const ff=funFridayStatus(s.student);
+           return `
            <div class="qe-picked">
              <div class="av">${initials(s.studentName)}</div>
              <div><b>${esc(s.studentName)}</b><span>Grade ${esc(s.grade)}${s.teacher?" · "+esc(s.teacher):""}</span></div>
              <button class="btn sm" id="clearStu">Change</button>
-           </div>`:`
+           </div>
+           <div class="strike-panel">
+             <div class="sp-head">
+               <b>This week's strikes</b>
+               <span>Week of ${weekLabel(ws)} · clears Monday</span>
+             </div>
+             <div class="sp-grid">
+               <div class="sp-box ${t.tardy>=FF_LIMIT?"over":t.tardy?"some":""}">
+                 <div class="sp-k">Tardy</div>
+                 <div class="sp-v">${t.tardy}<small>/${FF_LIMIT}</small></div>
+                 ${t.tardy?`<div class="sp-note">${esc(strikeLabel(t.tardy,"tardy"))}</div>`:`<div class="sp-note">none yet</div>`}
+                 <button class="btn sm primary" data-qtardy="${s.student}">+ Tardy</button>
+               </div>
+               <div class="sp-box ${t.uniform>=FF_LIMIT?"over":t.uniform?"some":""}">
+                 <div class="sp-k">Uniform</div>
+                 <div class="sp-v">${t.uniform}<small>/${FF_LIMIT}</small></div>
+                 ${t.uniform?`<div class="sp-note">${esc(strikeLabel(t.uniform,"uniform violation"))}</div>`:`<div class="sp-note">none yet</div>`}
+                 <button class="btn sm primary" data-quniform="${s.student}">+ Uniform</button>
+               </div>
+             </div>
+             <div class="sp-ff ${ff.out?"out":ff.pending?"pending":"ok"}">
+               ${ff.out
+                 ? `${svg('M18 6L6 18M6 6l12 12')}<div><b>Not in Fun Friday this week</b><span>${esc(ff.reason)}${ff.source==="policy"?" (automatic)":" (approved referral)"}</span></div>`
+                 : ff.pending
+                 ? `${svg('M12 8v4l3 3M12 2a10 10 0 100 20 10 10 0 000-20z')}<div><b>Referral awaiting approval</b><span>${esc(ff.reason)}</span></div>`
+                 : `${svg('M20 6L9 17l-5-5')}<div><b>Eligible for Fun Friday</b><span>No strikes against them this week</span></div>`}
+               ${!ff.out&&!ff.pending?`<button class="btn sm" data-qff="${s.student}">${ROLE==="teacher"?"Request removal":"Remove from Fun Friday"}</button>`:""}
+             </div>
+           </div>`;})():`
            <input type="text" id="stuSearch" class="qe-input" placeholder="Start typing a student's name…" autocomplete="off"/>
            <div id="stuResults"></div>
            ${recent.length?`<div class="qe-recent"><span>Recent:</span>${recent.map(r=>`<button class="qe-pill" data-quick="${r.id}">${esc(r.name)}</button>`).join("")}</div>`:""}
@@ -1397,6 +1492,19 @@ RENDER.entry=function(){
     el2.oninput=e=>s[map[id]]=e.target.value;
     el2.onchange=e=>s[map[id]]=e.target.value;
   });
+  // strike + Fun Friday quick actions — these save on their own, no form needed
+  const keepDoorOpen=()=>{const dp=$("#doorPanel");return dp&&dp.open;};
+  $$("#view-entry [data-qtardy]").forEach(b=>b.onclick=async()=>{
+    const wasOpen=keepDoorOpen();
+    await logTracker(b.dataset.qtardy,"tardy");
+    if(wasOpen){const dp=$("#doorPanel");if(dp)dp.open=true;}
+  });
+  $$("#view-entry [data-quniform]").forEach(b=>b.onclick=async()=>{
+    const wasOpen=keepDoorOpen();
+    await logTracker(b.dataset.quniform,"uniform");
+    if(wasOpen){const dp=$("#doorPanel");if(dp)dp.open=true;}
+  });
+  $$("#view-entry [data-qff]").forEach(b=>b.onclick=()=>requestFunFridayFlag(ROLE!=="teacher",b.dataset.qff));
   $("#clearInc").onclick=()=>{resetEntry();RENDER.entry();};
   $("#saveInc").onclick=saveIncident;
   renderRecent();
@@ -1719,6 +1827,24 @@ function noFunFridayList(weekStart){
   });
   return out.sort((a,b)=>String(a.student.grade).localeCompare(String(b.student.grade))||a.student.name.localeCompare(b.student.name));
 }
+/** "1st tardy — recorded" / "2nd tardy — no Fun Friday" style label. */
+function strikeLabel(n,kind){
+  if(!n)return "";
+  if(n===1)return "1st "+kind+" — recorded";
+  if(n===FF_LIMIT)return "2nd "+kind+" — no Fun Friday";
+  return n+" "+kind+"s — no Fun Friday";
+}
+/** Is this student on the no-Fun-Friday list for the current week, and why. */
+function funFridayStatus(studentId){
+  const ws=mondayOf(todayStr());
+  const auto=autoExcluded(studentId,ws);
+  if(auto)return {out:true,reason:auto,source:"policy"};
+  const ap=weekFlags(ws,"approved").find(f=>f.student===studentId);
+  if(ap)return {out:true,reason:ap.reason||"Staff referral",source:"approved"};
+  const pd=weekFlags(ws,"pending").find(f=>f.student===studentId);
+  if(pd)return {out:false,pending:true,reason:pd.reason||""};
+  return {out:false};
+}
 function pendingFlagCount(){ return weekFlags(mondayOf(todayStr()),"pending").length; }
 
 async function logTracker(studentId,type){
@@ -1802,8 +1928,10 @@ RENDER.tracker=function(){
        <td><b data-open="${r.st.id}" style="cursor:pointer;color:${r.lost?"#a71f19":"var(--teal-dark)"}">${esc(r.st.name)}</b>
          ${r.lost?`<div style="font-size:11.5px;color:#a71f19;font-weight:600">${esc(r.lost)}</div>`:""}</td>
        <td>${esc(r.st.grade||"—")}</td>
-       <td style="text-align:center"><span class="tally ${r.t.tardy>=FF_LIMIT?"over":r.t.tardy?"some":""}">${r.t.tardy}</span></td>
-       <td style="text-align:center"><span class="tally ${r.t.uniform>=FF_LIMIT?"over":r.t.uniform?"some":""}">${r.t.uniform}</span></td>
+       <td style="text-align:center"><span class="tally ${r.t.tardy>=FF_LIMIT?"over":r.t.tardy?"some":""}">${r.t.tardy}</span>
+         ${r.t.tardy?`<div style="font-size:10.5px;color:${r.t.tardy>=FF_LIMIT?"#a71f19":"var(--muted)"};font-weight:600;margin-top:3px">${r.t.tardy>=FF_LIMIT?"2nd strike":"1st strike"}</div>`:""}</td>
+       <td style="text-align:center"><span class="tally ${r.t.uniform>=FF_LIMIT?"over":r.t.uniform?"some":""}">${r.t.uniform}</span>
+         ${r.t.uniform?`<div style="font-size:10.5px;color:${r.t.uniform>=FF_LIMIT?"#a71f19":"var(--muted)"};font-weight:600;margin-top:3px">${r.t.uniform>=FF_LIMIT?"2nd strike":"1st strike"}</div>`:""}</td>
        <td>${r.lost?`<span class="pill s4">NOT participating</span>`:`<span class="pill s1">Eligible</span>`}</td>
        ${isThisWeek?`<td style="text-align:right;white-space:nowrap">
          <button class="btn sm" data-tardy="${r.st.id}">+ Tardy</button>
@@ -1911,7 +2039,7 @@ RENDER.funfriday=function(){
   $$("#view-funfriday [data-open]").forEach(b=>b.onclick=()=>openStudent(b.dataset.open));
 };
 
-function requestFunFridayFlag(instant){
+function requestFunFridayFlag(instant,prefillId){
   const scope=DB.students.filter(x=>ROLE!=="teacher"||!MY_CLASSROOM||x.teacher===MY_CLASSROOM);
   modal(`
    <div class="modal-head"><h3>${instant?"Add to the no Fun Friday list":"Request a student be added"}</h3>
@@ -1919,7 +2047,7 @@ function requestFunFridayFlag(instant){
    <div class="modal-body">
      ${instant?"":`<p style="color:var(--muted);font-size:13px;margin:0 0 14px">This goes to Admin and the Behavior Team for approval. The student is not on the list until it's approved.</p>`}
      <div class="field"><label>Student</label>
-       <select id="ffStu">${scope.map(x=>`<option value="${x.id}">${esc(x.name)} — Gr ${esc(x.grade||"")}</option>`).join("")}</select></div>
+       <select id="ffStu">${scope.map(x=>`<option value="${x.id}" ${x.id===prefillId?"selected":""}>${esc(x.name)} — Gr ${esc(x.grade||"")}</option>`).join("")}</select></div>
      <div class="field"><label>Reason</label>
        <textarea id="ffReason" placeholder="Why should this student miss Fun Friday this week?"></textarea>
        <div class="help">Tardies and uniform violations are counted automatically — this is for anything else.</div></div>
