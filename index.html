@@ -283,6 +283,18 @@ input,select,textarea{font-family:var(--body);font-size:15px}
 .mobile-nav{display:none}
 
 
+/* ---------- Weekly tracker ---------- */
+.week-bar{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 16px;box-shadow:var(--shadow)}
+.week-bar .wk{flex:1}
+.week-bar .wk b{display:block;font-family:var(--disp);font-size:15px;font-weight:600}
+.week-bar .wk span{font-size:12px;color:var(--muted)}
+.tally{display:inline-grid;place-items:center;width:31px;height:31px;border-radius:9px;background:var(--paper);
+  font-family:var(--disp);font-weight:700;font-size:15px;color:var(--muted)}
+.tally.some{background:var(--yellow-tint);color:#7a5c00}
+.tally.over{background:var(--red);color:#fff}
+tr.row-lost td{background:var(--red-tint)}
+tr.row-lost:hover td{background:#f9d2cf}
+
 /* ---------- Quick Entry ---------- */
 .qe{max-width:760px;padding-bottom:96px}
 .qe-hero{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:22px;flex-wrap:wrap}
@@ -481,6 +493,7 @@ textarea.qe-input{min-height:70px;resize:vertical}
         <div class="sub" id="pageSub">Log an incident in under a minute</div>
       </div>
       <div class="spacer"></div>
+      <button id="outboxBadge" class="cloud-badge local" style="display:none;border:0;cursor:pointer" title="Click to retry syncing"></button>
       <select id="roleSel" style="display:none">
         <option value="teacher">Teacher</option>
         <option value="behavior">Behavior Team</option>
@@ -500,6 +513,8 @@ textarea.qe-input{min-height:70px;resize:vertical}
     <div class="content">
       <section id="view-entry" class="view active"></section>
       <section id="view-students" class="view"></section>
+      <section id="view-tracker" class="view"></section>
+      <section id="view-funfriday" class="view"></section>
       <section id="view-roster" class="view"></section>
       <section id="view-interventions" class="view"></section>
       <section id="view-support" class="view"></section>
@@ -576,7 +591,7 @@ const nowTime=()=>new Date().toTimeString().slice(0,5);
 const timeBucket=t=>{const h=+t.slice(0,2);if(h<9)return"Before 9am";if(h<11)return"9–11am";if(h<13)return"11am–1pm";if(h<15)return"1–3pm";return"After 3pm";};
 
 /* ---------- state ---------- */
-let DB={students:[],teachers:[],incidents:[],support:[],consequences:[]};
+let DB={students:[],teachers:[],incidents:[],support:[],consequences:[],tracker:[],flags:[]};
 let ROLE="teacher";
 let activeView="entry";
 let MY_CLASSROOM="";
@@ -627,7 +642,12 @@ const MAP={
   consequences:{table:"consequences",cols:{student:"student_id",studentName:"student_name",type:"type",date:"assigned_on",
     assignedBy:"assigned_by",duration:"duration",reason:"reason",status:"status",notes:"notes",incident:"incident_id",createdBy:"created_by"}},
   students:{table:"students",cols:{id:"id",name:"name",grade:"grade",room:"room",teacher:"teacher",active:"active"}},
-  teachers:{table:"staff",cols:{name:"name",grade:"grade",room:"room",active:"active"}}
+  teachers:{table:"staff",cols:{name:"name",grade:"grade",room:"room",active:"active"}},
+  tracker:{table:"tracker_events",cols:{student:"student_id",studentName:"student_name",grade:"grade",teacher:"teacher",
+    weekStart:"week_start",type:"event_type",date:"occurred_on",note:"note",voided:"voided",createdBy:"created_by"}},
+  flags:{table:"fun_friday_flags",cols:{student:"student_id",studentName:"student_name",grade:"grade",teacher:"teacher",
+    weekStart:"week_start",reason:"reason",status:"status",requestedBy:"requested_by",decidedBy:"decided_by",
+    decidedNote:"decided_note",createdBy:"created_by"}}
 };
 function toRow(kind,obj){
   const m=MAP[kind].cols,row={};
@@ -648,49 +668,157 @@ function fromRow(kind,row){
 async function cloudLoad(){
   // select("*") everywhere, then filter in JS — that way a missing optional
   // column (from an older schema) can never take the whole load down.
-  const [st,sf,inc,sup,con]=await Promise.all([
+  const [st,sf,inc,sup,con,trk,flg]=await Promise.all([
     sb.from("students").select("*"),
     sb.from("staff").select("*"),
     sb.from("incidents").select("*").order("occurred_on",{ascending:false}).limit(5000),
     sb.from("support_requests").select("*").order("occurred_on",{ascending:false}).limit(5000),
-    sb.from("consequences").select("*").order("assigned_on",{ascending:false}).limit(5000)
+    sb.from("consequences").select("*").order("assigned_on",{ascending:false}).limit(5000),
+    sb.from("tracker_events").select("*").order("occurred_on",{ascending:false}).limit(8000),
+    sb.from("fun_friday_flags").select("*").order("created_at",{ascending:false}).limit(3000)
   ]);
-  const err=[st,sf,inc,sup,con].find(r=>r.error);
+  const err=[st,sf,inc,sup,con].find(r=>r.error);  // new tables are optional
   if(err)throw new Error(err.error.message);
   return {
     students:(st.data||[]).filter(r=>r.active!==false).map(r=>fromRow("students",r)),
     teachers:(sf.data||[]).filter(r=>r.active!==false).map(r=>fromRow("teachers",r)),
     incidents:(inc.data||[]).map(r=>fromRow("incidents",r)),
     support:(sup.data||[]).map(r=>fromRow("support",r)),
-    consequences:(con.data||[]).map(r=>fromRow("consequences",r))
+    consequences:(con.data||[]).map(r=>fromRow("consequences",r)),
+    tracker:((trk&&trk.data)||[]).filter(r=>!r.voided).map(r=>fromRow("tracker",r)),
+    flags:((flg&&flg.data)||[]).map(r=>fromRow("flags",r))
   };
 }
 async function addRecord(kind,obj){
   DB[kind].unshift(obj);            // optimistic — screen updates instantly
   if(!CLOUD){save();return obj;}
-  const {data,error}=await sb.from(MAP[kind].table).insert(toRow(kind,obj)).select().single();
-  if(error){
-    DB[kind]=DB[kind].filter(x=>x!==obj);
-    toast("Not saved: "+error.message);
-    return null;
-  }
-  Object.assign(obj,fromRow(kind,data));
+  const res=await pushRow(kind,obj);
+  if(res.ok){ Object.assign(obj,fromRow(kind,res.data)); return obj; }
+  // Cloud refused it. Keep the record — never lose a teacher's entry.
+  queueOutbox(kind,obj);
+  toast("Saved on this device — will sync when the database is reachable");
   return obj;
 }
+
+/* ---------- resilient write ----------
+   PostgREST rejects the whole insert if it sees a column the database
+   doesn't have yet (e.g. the schema update hasn't been run). Rather than
+   losing the entry, drop the offending column and retry. Columns found to
+   be unsupported are remembered so later writes skip them immediately. */
+const UNSUPPORTED_KEY="bultum_unsupported_cols";
+let UNSUPPORTED=(function(){try{return JSON.parse(localStorage.getItem(UNSUPPORTED_KEY)||"{}");}catch(e){return {};}})();
+function markUnsupported(table,col){
+  (UNSUPPORTED[table]=UNSUPPORTED[table]||[]);
+  if(UNSUPPORTED[table].indexOf(col)<0)UNSUPPORTED[table].push(col);
+  try{localStorage.setItem(UNSUPPORTED_KEY,JSON.stringify(UNSUPPORTED));}catch(e){}
+  console.warn("Column not in database, skipping:",table+"."+col,"— run supabase-schema.sql to enable it");
+}
+function stripUnsupported(table,row){
+  const bad=UNSUPPORTED[table]||[];
+  bad.forEach(c=>{delete row[c];});
+  return row;
+}
+function missingColumn(msg){
+  const m=/column [`'"]?([a-z0-9_]+)[`'"]? of relation/i.exec(msg)
+       || /Could not find the [`'"]?([a-z0-9_]+)[`'"]? column/i.exec(msg)
+       || /column [`'"]?[a-z_]*\.?([a-z0-9_]+)[`'"]? does not exist/i.exec(msg);
+  return m?m[1]:null;
+}
+async function pushRow(kind,obj){
+  const table=MAP[kind].table;
+  let row=stripUnsupported(table,toRow(kind,obj));
+  for(let attempt=0;attempt<10;attempt++){
+    const {data,error}=await sb.from(table).insert(row).select().single();
+    if(!error) return {ok:true,data:data};
+    const col=missingColumn(error.message||"");
+    if(col && Object.prototype.hasOwnProperty.call(row,col)){
+      markUnsupported(table,col);
+      delete row[col];
+      continue;                     // retry without it
+    }
+    if(col){ markUnsupported(table,col); continue; }
+    return {ok:false,error:error};
+  }
+  return {ok:false,error:{message:"too many retries"}};
+}
+
 async function updateRecord(kind,id,patch){
   const rec=DB[kind].find(x=>x.id===id);if(rec)Object.assign(rec,patch);
   if(!CLOUD){save();return;}
-  const row={};const m=MAP[kind].cols;
+  const table=MAP[kind].table, m=MAP[kind].cols;
+  let row={};
   for(const k in patch) if(m[k]) row[m[k]]=patch[k];
-  const {error}=await sb.from(MAP[kind].table).update(row).eq("id",id);
-  if(error)toast("Not saved: "+error.message);
+  row=stripUnsupported(table,row);
+  for(let attempt=0;attempt<10;attempt++){
+    if(!Object.keys(row).length) return;
+    const {error}=await sb.from(table).update(row).eq("id",id);
+    if(!error) return;
+    const col=missingColumn(error.message||"");
+    if(col){ markUnsupported(table,col); delete row[col]; continue; }
+    queueOutbox(kind,rec||{id:id},{patch:patch});
+    toast("Change saved on this device — will sync shortly");
+    return;
+  }
+}
+
+/* ---------- outbox: nothing is ever lost ---------- */
+const OUTBOX_KEY="bultum_outbox";
+function readOutbox(){try{return JSON.parse(localStorage.getItem(OUTBOX_KEY)||"[]");}catch(e){return [];}}
+function writeOutbox(a){try{localStorage.setItem(OUTBOX_KEY,JSON.stringify(a.slice(-500)));}catch(e){}}
+function queueOutbox(kind,obj,extra){
+  const box=readOutbox();
+  box.push(Object.assign({kind:kind,obj:obj,queuedAt:new Date().toISOString()},extra||{}));
+  writeOutbox(box);
+  updateOutboxBadge();
+}
+async function flushOutbox(){
+  if(!CLOUD||!sb)return;
+  let box=readOutbox();
+  if(!box.length){updateOutboxBadge();return;}
+  const remaining=[];
+  for(const item of box){
+    try{
+      if(item.patch){
+        const table=MAP[item.kind].table,m=MAP[item.kind].cols;
+        let row={};for(const k in item.patch) if(m[k]) row[m[k]]=item.patch[k];
+        const {error}=await sb.from(table).update(stripUnsupported(table,row)).eq("id",item.obj.id);
+        if(error)remaining.push(item);
+      }else{
+        const res=await pushRow(item.kind,item.obj);
+        if(!res.ok)remaining.push(item);
+      }
+    }catch(e){remaining.push(item);}
+  }
+  writeOutbox(remaining);
+  updateOutboxBadge();
+  const synced=box.length-remaining.length;
+  if(synced>0){
+    toast(synced+" pending "+(synced===1?"entry":"entries")+" synced");
+    try{ DB=await cloudLoad(); RENDER[activeView]&&RENDER[activeView](); renderNav(); renderAlerts(); }catch(e){}
+  }
+}
+function updateOutboxBadge(){
+  const n=readOutbox().length, el=$("#outboxBadge");
+  if(!el)return;
+  el.style.display=n?"inline-flex":"none";
+  el.textContent=n+" to sync";
+  el.onclick=flushOutbox;
+}
+/* Merge anything still queued into the in-memory data so it stays visible
+   after a reload, even before it reaches the database. */
+function mergeOutboxIntoDB(){
+  readOutbox().forEach(item=>{
+    if(item.patch)return;
+    if(!DB[item.kind])return;
+    if(!DB[item.kind].some(x=>x.id===item.obj.id))DB[item.kind].unshift(item.obj);
+  });
 }
 
 /* ---------- realtime: everyone sees new entries as they land ---------- */
 let pollTimer=null;
 function subscribeRealtime(){
   const ch=sb.channel("behavior-portal");
-  ["incidents","support_requests","consequences","students","staff"].forEach(tbl=>{
+  ["incidents","support_requests","consequences","students","staff","tracker_events","fun_friday_flags"].forEach(tbl=>{
     ch.on("postgres_changes",{event:"*",schema:"public",table:tbl},handleChange);
   });
   ch.subscribe(status=>{
@@ -721,7 +849,7 @@ async function refreshFromCloud(){
 }
 function handleChange(payload){
       const t=payload.table;
-      const kind = t==="incidents"?"incidents":t==="support_requests"?"support":t==="consequences"?"consequences":t==="students"?"students":t==="staff"?"teachers":null;
+      const kind = t==="incidents"?"incidents":t==="support_requests"?"support":t==="consequences"?"consequences":t==="students"?"students":t==="staff"?"teachers":t==="tracker_events"?"tracker":t==="fun_friday_flags"?"flags":null;
       if(!kind)return;
       if(payload.eventType==="INSERT"){
         if(DB[kind].some(x=>x.id===payload.new.id))return;   // our own write
@@ -945,7 +1073,7 @@ function seed(){
   hot.forEach((s,i)=>{const c=6+Math.floor(Math.random()*6);for(let j=0;j<c;j++)addIncident(s,Math.floor(Math.random()*(j<c/2?14:35)));});
 
   incidents.sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time));
-  return {students,teachers,incidents,support,consequences,meta:{created:todayStr()}};
+  return {students,teachers,incidents,support,consequences,tracker:[],flags:[],meta:{created:todayStr()}};
 }
 function addMin(t,m){const[h,mi]=t.split(":").map(Number);const d=new Date(0,0,0,h,mi+m);return d.toTimeString().slice(0,5);}
 function descFor(cat,s){
@@ -1006,6 +1134,8 @@ function within(days){const c=daysAgo(days);return DB.incidents.filter(i=>i.date
 const NAV=[
   {id:"entry",label:"Quick Entry",title:"Quick Entry",sub:"Log an incident in under a minute",roles:["teacher","behavior","admin"],icon:'M12 5v14M5 12h14'},
   {id:"students",label:"Student Profiles",title:"Student Behavior Profiles",sub:"Full history and patterns for each student",roles:["teacher","behavior","admin"],icon:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM22 21v-2a4 4 0 0 0-3-3.87M16 3.13A4 4 0 0119 7'},
+  {id:"tracker",label:"Tardy & Uniform",title:"Weekly Tardy & Uniform Tracker",sub:"Resets every Monday",roles:["teacher","behavior","admin"],icon:'M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11'},
+  {id:"funfriday",label:"Fun Friday",title:"No Fun Friday List",sub:"Who is not participating this week",roles:["teacher","behavior","admin"],icon:'M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z'},
   {id:"roster",label:"Roster",title:"Roster Management",sub:"Add or archive students and staff",roles:["behavior","admin"],icon:'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 100 8 4 4 0 000-8zM23 21v-2a4 4 0 00-3-3.87M16 3.13A4 4 0 0119 7M20 8v6M23 11h-6'},
   {id:"interventions",label:"Interventions",title:"Consequences & Interventions",sub:"Track supports assigned and their follow-through",roles:["behavior","admin"],icon:'M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11'},
   {id:"support",label:"Support Requests",title:"Teacher Behavior Support",sub:"Requests to the Behavior Team over time",roles:["behavior","admin"],icon:'M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0'},
@@ -1038,6 +1168,7 @@ function renderNav(){
 function badgeFor(id){
   if(id==="admin"||id==="interventions"){const r=openRemovals().length;if(r)return `<span class="badge" style="background:#d6392f;color:#fff">${r}</span>`;
     const n=newActivity().length;return n?`<span class="badge" style="background:var(--teal);color:#fff">${n}</span>`:"";}
+  if(id==="funfriday"){const p=pendingFlagCount();return p?`<span class="badge" style="background:var(--amber);color:#4a3900">${p}</span>`:"";}
   if(id==="risk"){const crit=classroomStats().filter(r=>r.level==="r"||r.level==="o").length;return crit?`<span class="badge">${crit}</span>`:"";}
   if(id==="support"){const open=DB.support.filter(s=>s.date>=daysAgo(7)).length;return open?`<span class="badge">${open}</span>`:"";}
   return "";
@@ -1529,6 +1660,286 @@ async function connectionCheck(){
       It is safe to run again over an existing database — it repairs older tables rather than replacing them.
       Then reload this page.</p></div>`:""}
     ${CLOUD_ERROR?`<div style="margin-top:14px;font-size:11.5px;color:var(--muted);white-space:pre-wrap">${esc(CLOUD_ERROR)}</div>`:""}`;
+}
+
+/* ============================================================
+   WEEKLY TARDY & UNIFORM TRACKER  +  NO FUN FRIDAY LIST
+   Policy: 1st tardy recorded · 2nd tardy loses Fun Friday.
+           1st uniform recorded · 2nd uniform loses Fun Friday.
+   Tallies are scoped to the week beginning Monday, so every student
+   starts each Monday with a clean slate while history is preserved.
+   ============================================================ */
+const FF_LIMIT=2;
+
+function mondayOf(dateStr){
+  const d=new Date((dateStr||todayStr())+"T00:00:00");
+  const day=d.getDay();                 // 0 Sun .. 6 Sat
+  const back=(day===0?6:day-1);         // Sunday counts with the week just ending
+  d.setDate(d.getDate()-back);
+  return d.toISOString().slice(0,10);
+}
+function fridayOf(weekStart){
+  const d=new Date(weekStart+"T00:00:00");d.setDate(d.getDate()+4);
+  return d.toISOString().slice(0,10);
+}
+function weekLabel(weekStart){
+  const a=new Date(weekStart+"T00:00:00"), b=new Date(fridayOf(weekStart)+"T00:00:00");
+  const opt={month:"short",day:"numeric"};
+  return a.toLocaleDateString("en-US",opt)+" – "+b.toLocaleDateString("en-US",opt);
+}
+function tallyFor(studentId,weekStart){
+  let tardy=0,uniform=0;
+  DB.tracker.forEach(e=>{
+    if(e.student!==studentId||e.weekStart!==weekStart||e.voided)return;
+    if(e.type==="tardy")tardy++; else if(e.type==="uniform")uniform++;
+  });
+  return {tardy:tardy,uniform:uniform};
+}
+/** Automatic policy exclusion — no approval needed. */
+function autoExcluded(studentId,weekStart){
+  const t=tallyFor(studentId,weekStart), reasons=[];
+  if(t.tardy>=FF_LIMIT)reasons.push(t.tardy+" tardies");
+  if(t.uniform>=FF_LIMIT)reasons.push(t.uniform+" uniform violations");
+  return reasons.length?reasons.join(" · "):null;
+}
+function weekFlags(weekStart,status){
+  return DB.flags.filter(f=>f.weekStart===weekStart&&(!status||f.status===status));
+}
+/** Everyone off the list this week: policy removals plus approved staff requests. */
+function noFunFridayList(weekStart){
+  const out=[];
+  DB.students.forEach(st=>{
+    const auto=autoExcluded(st.id,weekStart);
+    if(auto)out.push({student:st,reason:auto,source:"policy"});
+  });
+  weekFlags(weekStart,"approved").forEach(f=>{
+    if(out.some(o=>o.student.id===f.student))return;
+    const st=DB.students.find(x=>x.id===f.student)||{id:f.student,name:f.studentName,grade:f.grade,teacher:f.teacher};
+    out.push({student:st,reason:f.reason||"Staff referral",source:"approved",flag:f});
+  });
+  return out.sort((a,b)=>String(a.student.grade).localeCompare(String(b.student.grade))||a.student.name.localeCompare(b.student.name));
+}
+function pendingFlagCount(){ return weekFlags(mondayOf(todayStr()),"pending").length; }
+
+async function logTracker(studentId,type){
+  const st=DB.students.find(x=>x.id===studentId);if(!st)return;
+  const ws=mondayOf(todayStr());
+  const before=autoExcluded(studentId,ws);
+  await addRecord("tracker",{id:newId(),student:st.id,studentName:st.name,grade:st.grade,teacher:st.teacher,
+    weekStart:ws,type:type,date:todayStr(),note:"",voided:false,createdBy:ME?ME.name:USERS[ROLE].name});
+  const after=autoExcluded(studentId,ws);
+  RENDER[activeView]&&RENDER[activeView]();renderNav();
+  if(after&&after!==before){
+    const t=tallyFor(studentId,ws);
+    modal(`
+     <div class="modal-head" style="background:linear-gradient(100deg,#b8630f,#e2952a);color:#fff;border-bottom:0">
+       <div><h3 style="color:#fff">${esc(st.name)} loses Fun Friday</h3>
+       <div style="font-size:12.5px;opacity:.93">Week of ${weekLabel(ws)}</div></div>
+       <button class="x" onclick="closeModal()" style="background:rgba(255,255,255,.22);color:#fff">×</button></div>
+     <div class="modal-body">
+       <p style="font-size:14px;line-height:1.6;margin:0 0 14px">That was the <b>${type==="tardy"?"second tardy":"second uniform violation"}</b> this week, so ${esc(st.name.split(" ")[0])} does not participate in Fun Friday on <b>${fmtDate(fridayOf(ws))}</b>.</p>
+       <div class="grid g-2">
+         <div class="stat ${t.tardy>=FF_LIMIT?"red":""}"><div class="rail"></div><div class="k">Tardies</div><div class="v">${t.tardy}</div></div>
+         <div class="stat ${t.uniform>=FF_LIMIT?"red":""}"><div class="rail"></div><div class="k">Uniform</div><div class="v">${t.uniform}</div></div>
+       </div>
+       <p style="font-size:13px;color:var(--muted);margin:14px 0 0">The list is visible to admin and the Behavior Team automatically. Please let the family know so Friday isn't a surprise.</p>
+     </div>
+     <div class="modal-foot"><button class="btn primary" onclick="closeModal()">Got it</button></div>`);
+  } else {
+    toast(st.name.split(" ")[0]+": "+(type==="tardy"?"tardy":"uniform")+" recorded");
+  }
+}
+async function voidTracker(id){
+  const e=DB.tracker.find(x=>x.id===id);if(!e)return;
+  if(!confirm("Remove this "+(e.type==="tardy"?"tardy":"uniform violation")+" for "+e.studentName+"?\n\nUse this for mis-taps. The record is voided, not deleted."))return;
+  await updateRecord("tracker",id,{voided:true});
+  DB.tracker=DB.tracker.filter(x=>x.id!==id);
+  toast("Entry removed");RENDER[activeView]&&RENDER[activeView]();renderNav();
+}
+
+/* ---------- Tracker view ---------- */
+let trackWeek=null, trackQ="";
+RENDER.tracker=function(){
+  const el=$("#view-tracker");
+  const ws=trackWeek||mondayOf(todayStr());
+  const isThisWeek = ws===mondayOf(todayStr());
+  const scope=DB.students.filter(x=>ROLE!=="teacher"||!MY_CLASSROOM||x.teacher===MY_CLASSROOM)
+    .filter(x=>x.name.toLowerCase().includes(trackQ.toLowerCase()));
+  const rows=scope.map(st=>({st:st,t:tallyFor(st.id,ws),lost:autoExcluded(st.id,ws)}))
+    .sort((a,b)=>(b.lost?1:0)-(a.lost?1:0) || (b.t.tardy+b.t.uniform)-(a.t.tardy+a.t.uniform) || a.st.name.localeCompare(b.st.name));
+  const lostCount=rows.filter(r=>r.lost).length;
+  const totT=rows.reduce((n,r)=>n+r.t.tardy,0), totU=rows.reduce((n,r)=>n+r.t.uniform,0);
+  const prevWeek=(()=>{const d=new Date(ws+"T00:00:00");d.setDate(d.getDate()-7);return d.toISOString().slice(0,10);})();
+  const nextWeek=(()=>{const d=new Date(ws+"T00:00:00");d.setDate(d.getDate()+7);return d.toISOString().slice(0,10);})();
+
+  el.innerHTML=`
+   <div class="page-head"><h2>Weekly tardy &amp; uniform tracker</h2>
+     <p>Second tardy or second uniform violation means no Fun Friday that week. Tallies clear every Monday.</p></div>
+
+   <div class="week-bar">
+     <button class="btn sm" id="wPrev">${svg('M15 18l-6-6 6-6')}</button>
+     <div class="wk"><b>Week of ${weekLabel(ws)}</b>
+       <span>${isThisWeek?"Current week · resets Monday":"Past week · read-only view"}</span></div>
+     <button class="btn sm" id="wNext" ${isThisWeek?"disabled":""}>${svg('M9 18l6-6-6-6')}</button>
+     ${!isThisWeek?`<button class="btn sm" id="wNow">Back to this week</button>`:""}
+   </div>
+
+   <div class="grid g-3" style="margin:16px 0 18px">
+     <div class="stat"><div class="rail"></div><div class="k">Tardies this week</div><div class="v">${totT}</div></div>
+     <div class="stat amber"><div class="rail"></div><div class="k">Uniform violations</div><div class="v">${totU}</div></div>
+     <div class="stat ${lostCount?"red":"green"}"><div class="rail"></div><div class="k">No Fun Friday</div><div class="v">${lostCount}</div>
+       <div class="d">${lostCount?"tap a name to see why":"everyone eligible"}</div></div>
+   </div>
+
+   <div class="toolbar">
+     <div class="search">${svg('M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z')}<input type="text" id="trackQ" placeholder="Search students…" value="${esc(trackQ)}"/></div>
+     ${ROLE!=="teacher"?`<button class="btn" onclick="go('funfriday')">${svg('M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z')} Fun Friday list</button>`:""}
+   </div>
+
+   <div class="card"><div style="overflow-x:auto"><table class="tbl">
+     <thead><tr><th>Student</th><th>Gr</th><th style="text-align:center">Tardy</th><th style="text-align:center">Uniform</th><th>Fun Friday</th>${isThisWeek?`<th style="text-align:right">Record</th>`:""}</tr></thead>
+     <tbody>${rows.length?rows.map(r=>`<tr class="${r.lost?"row-lost":""}">
+       <td><b data-open="${r.st.id}" style="cursor:pointer;color:${r.lost?"#a71f19":"var(--teal-dark)"}">${esc(r.st.name)}</b>
+         ${r.lost?`<div style="font-size:11.5px;color:#a71f19;font-weight:600">${esc(r.lost)}</div>`:""}</td>
+       <td>${esc(r.st.grade||"—")}</td>
+       <td style="text-align:center"><span class="tally ${r.t.tardy>=FF_LIMIT?"over":r.t.tardy?"some":""}">${r.t.tardy}</span></td>
+       <td style="text-align:center"><span class="tally ${r.t.uniform>=FF_LIMIT?"over":r.t.uniform?"some":""}">${r.t.uniform}</span></td>
+       <td>${r.lost?`<span class="pill s4">NOT participating</span>`:`<span class="pill s1">Eligible</span>`}</td>
+       ${isThisWeek?`<td style="text-align:right;white-space:nowrap">
+         <button class="btn sm" data-tardy="${r.st.id}">+ Tardy</button>
+         <button class="btn sm" data-uniform="${r.st.id}">+ Uniform</button></td>`:""}
+     </tr>`).join(""):`<tr><td colspan="6" class="empty">${trackQ?"No students match.":"No students on the roster yet."}</td></tr>`}</tbody>
+   </table></div></div>
+
+   ${isThisWeek?`<div class="card" style="margin-top:16px">
+     <div class="card-head"><h3>This week's entries</h3><span class="hint">tap to remove a mis-tap</span></div>
+     <div class="list-scroll">${(()=>{
+       const evs=DB.tracker.filter(e=>e.weekStart===ws&&!e.voided&&(ROLE!=="teacher"||!MY_CLASSROOM||e.teacher===MY_CLASSROOM))
+         .sort((a,b)=>b.date.localeCompare(a.date));
+       return evs.length?evs.slice(0,40).map(e=>`<div class="mini-row" style="padding:10px 16px">
+         <span class="pill ${e.type==="tardy"?"s2":"s3"}">${e.type==="tardy"?"Tardy":"Uniform"}</span>
+         <div style="flex:1"><div class="mn">${esc(e.studentName)}</div>
+           <div class="mm">${fmtDateShort(e.date)} · logged by ${esc(e.createdBy||"—")}</div></div>
+         <button class="btn sm danger" data-void="${e.id}">Remove</button>
+       </div>`).join(""):`<div class="empty">Nothing recorded yet this week.</div>`;
+     })()}</div>
+   </div>`:""}`;
+
+  $("#wPrev").onclick=()=>{trackWeek=prevWeek;RENDER.tracker();};
+  $("#wNext").onclick=()=>{if(!isThisWeek){trackWeek=nextWeek;RENDER.tracker();}};
+  const wn=$("#wNow");if(wn)wn.onclick=()=>{trackWeek=null;RENDER.tracker();};
+  $("#trackQ").oninput=e=>{trackQ=e.target.value;RENDER.tracker();$("#trackQ").focus();};
+  $$("#view-tracker [data-tardy]").forEach(b=>b.onclick=()=>logTracker(b.dataset.tardy,"tardy"));
+  $$("#view-tracker [data-uniform]").forEach(b=>b.onclick=()=>logTracker(b.dataset.uniform,"uniform"));
+  $$("#view-tracker [data-void]").forEach(b=>b.onclick=()=>voidTracker(b.dataset.void));
+  $$("#view-tracker [data-open]").forEach(b=>b.onclick=()=>openStudent(b.dataset.open));
+};
+
+/* ---------- Fun Friday view ---------- */
+RENDER.funfriday=function(){
+  const el=$("#view-funfriday");
+  const ws=mondayOf(todayStr());
+  const list=noFunFridayList(ws);
+  const pending=weekFlags(ws,"pending");
+  const denied=weekFlags(ws,"denied");
+  const canDecide=ROLE!=="teacher";
+  el.innerHTML=`
+   <div class="page-head"><h2>No Fun Friday list</h2>
+     <p>Week of ${weekLabel(ws)} · Fun Friday falls on ${fmtDate(fridayOf(ws))}. The list clears every Monday.</p></div>
+
+   ${pending.length&&canDecide?`
+   <div class="card" style="margin-bottom:18px;border:2px solid var(--amber)">
+     <div class="card-head" style="background:var(--amber-tint)">
+       <h3>${pending.length} staff request${pending.length===1?"":"s"} awaiting your decision</h3>
+     </div>
+     ${pending.map(f=>`<div class="removal-row">
+       <div class="av" style="width:34px;height:34px;border-radius:9px;background:var(--amber-tint);color:#7a5c00;display:grid;place-items:center;font-family:var(--disp);font-weight:600;font-size:12px">${initials(f.studentName)}</div>
+       <div class="rl"><div style="font-weight:600;font-size:14px">${esc(f.studentName)} <span style="color:var(--muted);font-weight:500">· Gr ${esc(f.grade||"")}</span></div>
+         <div style="font-size:12.5px;color:var(--ink-soft)">${esc(f.reason||"No reason given")}</div>
+         <div style="font-size:11.5px;color:var(--muted)">Requested by ${esc(f.requestedBy||"—")}</div></div>
+       <button class="btn sm primary" data-approve="${f.id}">Approve</button>
+       <button class="btn sm danger" data-deny="${f.id}">Decline</button>
+     </div>`).join("")}
+   </div>`:""}
+
+   <div class="grid g-3" style="margin-bottom:18px">
+     <div class="stat ${list.length?"red":"green"}"><div class="rail"></div><div class="k">Not participating</div><div class="v">${list.length}</div></div>
+     <div class="stat"><div class="rail"></div><div class="k">By policy</div><div class="v">${list.filter(x=>x.source==="policy").length}</div><div class="d">2nd tardy / uniform</div></div>
+     <div class="stat amber"><div class="rail"></div><div class="k">Staff referrals</div><div class="v">${list.filter(x=>x.source==="approved").length}${pending.length?` <span style="font-size:13px;font-weight:500">+${pending.length} pending</span>`:""}</div></div>
+   </div>
+
+   <div class="toolbar">
+     <button class="btn primary" id="ffAdd">${svg('M12 5v14M5 12h14')} ${canDecide?"Add a student to the list":"Request a student be added"}</button>
+     <button class="btn" onclick="go('tracker')">${svg('M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11')} Weekly tracker</button>
+     <div style="flex:1"></div>
+     <button class="btn" onclick="window.print()">${svg('M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z')} Print list</button>
+   </div>
+
+   <div class="card">
+     <div class="card-head"><h3>Students not participating this Friday</h3><span class="hint">${list.length} total</span></div>
+     <div style="overflow-x:auto"><table class="tbl">
+       <thead><tr><th>Student</th><th>Gr</th><th>Teacher</th><th>Reason</th><th>Added by</th>${canDecide?`<th></th>`:""}</tr></thead>
+       <tbody>${list.length?list.map(x=>`<tr>
+         <td><b data-open="${x.student.id}" style="cursor:pointer;color:var(--teal-dark)">${esc(x.student.name)}</b></td>
+         <td>${esc(x.student.grade||"—")}</td>
+         <td>${esc(x.student.teacher||"—")}</td>
+         <td>${esc(x.reason)}</td>
+         <td><span class="pill ${x.source==="policy"?"s3":"neutral"}">${x.source==="policy"?"Automatic":"Approved referral"}</span></td>
+         ${canDecide?`<td style="text-align:right">${x.flag?`<button class="btn sm" data-undo="${x.flag.id}">Remove</button>`:`<span style="font-size:11.5px;color:var(--muted)">policy</span>`}</td>`:""}
+       </tr>`).join(""):`<tr><td colspan="6" class="empty">Everyone is eligible for Fun Friday this week.</td></tr>`}</tbody>
+     </table></div>
+   </div>
+
+   ${!canDecide&&pending.length?`<div class="card" style="margin-top:16px"><div class="card-head"><h3>Your pending requests</h3></div>
+     ${pending.map(f=>`<div class="mini-row" style="padding:11px 16px"><div style="flex:1"><div class="mn">${esc(f.studentName)}</div><div class="mm">${esc(f.reason||"")}</div></div><span class="pill s2">Awaiting approval</span></div>`).join("")}</div>`:""}
+   ${denied.length&&canDecide?`<div class="card" style="margin-top:16px"><div class="card-head"><h3>Declined this week</h3></div>
+     ${denied.map(f=>`<div class="mini-row" style="padding:11px 16px"><div style="flex:1"><div class="mn">${esc(f.studentName)}</div><div class="mm">${esc(f.reason||"")} · declined by ${esc(f.decidedBy||"—")}</div></div><span class="pill neutral">Declined</span></div>`).join("")}</div>`:""}`;
+
+  $("#ffAdd").onclick=()=>requestFunFridayFlag(canDecide);
+  $$("#view-funfriday [data-approve]").forEach(b=>b.onclick=async()=>{
+    await updateRecord("flags",b.dataset.approve,{status:"approved",decidedBy:ME?ME.name:""});
+    toast("Added to the list");RENDER.funfriday();renderNav();
+  });
+  $$("#view-funfriday [data-deny]").forEach(b=>b.onclick=async()=>{
+    await updateRecord("flags",b.dataset.deny,{status:"denied",decidedBy:ME?ME.name:""});
+    toast("Request declined");RENDER.funfriday();renderNav();
+  });
+  $$("#view-funfriday [data-undo]").forEach(b=>b.onclick=async()=>{
+    await updateRecord("flags",b.dataset.undo,{status:"denied",decidedBy:ME?ME.name:"",decidedNote:"Removed from list"});
+    toast("Removed from the list");RENDER.funfriday();renderNav();
+  });
+  $$("#view-funfriday [data-open]").forEach(b=>b.onclick=()=>openStudent(b.dataset.open));
+};
+
+function requestFunFridayFlag(instant){
+  const scope=DB.students.filter(x=>ROLE!=="teacher"||!MY_CLASSROOM||x.teacher===MY_CLASSROOM);
+  modal(`
+   <div class="modal-head"><h3>${instant?"Add to the no Fun Friday list":"Request a student be added"}</h3>
+     <button class="x" onclick="closeModal()">×</button></div>
+   <div class="modal-body">
+     ${instant?"":`<p style="color:var(--muted);font-size:13px;margin:0 0 14px">This goes to Admin and the Behavior Team for approval. The student is not on the list until it's approved.</p>`}
+     <div class="field"><label>Student</label>
+       <select id="ffStu">${scope.map(x=>`<option value="${x.id}">${esc(x.name)} — Gr ${esc(x.grade||"")}</option>`).join("")}</select></div>
+     <div class="field"><label>Reason</label>
+       <textarea id="ffReason" placeholder="Why should this student miss Fun Friday this week?"></textarea>
+       <div class="help">Tardies and uniform violations are counted automatically — this is for anything else.</div></div>
+   </div>
+   <div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button>
+     <button class="btn primary" id="ffGo">${instant?"Add to list":"Send for approval"}</button></div>`);
+  $("#ffGo").onclick=async()=>{
+    const sid=$("#ffStu").value, st=DB.students.find(x=>x.id===sid);
+    const reason=$("#ffReason").value.trim();
+    if(!st){toast("Pick a student");return;}
+    if(!reason){toast("Add a reason");return;}
+    const ws=mondayOf(todayStr());
+    const me=ME?ME.name:USERS[ROLE].name;
+    await addRecord("flags",{id:newId(),student:st.id,studentName:st.name,grade:st.grade,teacher:st.teacher,
+      weekStart:ws,reason:reason,status:instant?"approved":"pending",requestedBy:me,
+      decidedBy:instant?me:"",decidedNote:"",createdBy:me});
+    closeModal();
+    toast(instant?st.name+" added to the list":"Request sent for approval");
+    RENDER[activeView]&&RENDER[activeView]();renderNav();
+  };
 }
 
 /* ============================================================
@@ -2567,6 +2978,7 @@ async function boot(){
   } else {
     DB=load();
   }
+  updateOutboxBadge();
   badge.className="cloud-badge"+(CLOUD?"":" local");
   badge.innerHTML=`<span class="dot" style="background:currentColor"></span>${CLOUD?"Shared":"This device only"}`;
   renderNav();
@@ -2578,7 +2990,7 @@ boot();
 window.closeModal=closeModal;window.go=go;window.openStudent=openStudent;window.addConsequenceFor=addConsequenceFor;
 window.printStudent=printStudent;window.resetData=resetData;window.signOut=signOut;
 window.addStudent=addStudent;window.addTeacher=addTeacher;
-window.suspensionLetter=suspensionLetter;window.connectionCheck=connectionCheck;window.backupInfo=backupInfo;window.fullBackup=fullBackup;window.connectionCheck=connectionCheck;window.backupInfo=backupInfo;window.fullBackup=fullBackup;window.removalsModal=removalsModal;window.pendingCallsModal=pendingCallsModal;window.renderAlerts=renderAlerts;window.applyRole=applyRole;
+window.suspensionLetter=suspensionLetter;window.connectionCheck=connectionCheck;window.backupInfo=backupInfo;window.flushOutbox=flushOutbox;window.logTracker=logTracker;window.voidTracker=voidTracker;window.requestFunFridayFlag=requestFunFridayFlag;window.fullBackup=fullBackup;window.connectionCheck=connectionCheck;window.backupInfo=backupInfo;window.flushOutbox=flushOutbox;window.logTracker=logTracker;window.voidTracker=voidTracker;window.requestFunFridayFlag=requestFunFridayFlag;window.fullBackup=fullBackup;window.removalsModal=removalsModal;window.pendingCallsModal=pendingCallsModal;window.renderAlerts=renderAlerts;window.applyRole=applyRole;
 </script>
 </body>
 </html>
