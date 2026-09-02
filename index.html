@@ -311,6 +311,8 @@ input,select,textarea{font-family:var(--body);font-size:15px}
 .sp-ff .btn{margin-left:auto}
 
 .qe-more.door{margin-bottom:16px}
+.door-add{padding:11px 14px;border-top:1px solid var(--line);margin:0 -14px}
+.door-add .btn{width:100%;justify-content:center}
 .qe-more.door summary svg{width:16px;height:16px;margin-right:8px;color:var(--teal)}
 .door-list{max-height:340px;overflow-y:auto;margin:0 -14px}
 .door-row{display:flex;align-items:center;gap:10px;padding:9px 14px;border-top:1px solid var(--line);flex-wrap:wrap}
@@ -1281,6 +1283,7 @@ RENDER.entry=function(){
            </div>`;
          }).join("");
        })()}</div>
+       <div class="door-add"><button class="btn sm" id="doorAdd">${svg('M12 5v14M5 12h14')} Add a student to my roster</button></div>
        <div style="padding:9px 0 12px;font-size:11.5px;color:var(--muted)">Second tardy or second uniform violation removes the student from Fun Friday automatically. Mis-taps can be undone on the Tardy &amp; Uniform tab.</div>
      </details>
 
@@ -1505,6 +1508,8 @@ RENDER.entry=function(){
     if(wasOpen){const dp=$("#doorPanel");if(dp)dp.open=true;}
   });
   $$("#view-entry [data-qff]").forEach(b=>b.onclick=()=>requestFunFridayFlag(ROLE!=="teacher",b.dataset.qff));
+  const da=$("#doorAdd");
+  if(da)da.onclick=()=>quickAddStudent("",()=>{RENDER.entry();const dp=$("#doorPanel");if(dp)dp.open=true;});
   $("#clearInc").onclick=()=>{resetEntry();RENDER.entry();};
   $("#saveInc").onclick=saveIncident;
   renderRecent();
@@ -1919,6 +1924,7 @@ RENDER.tracker=function(){
 
    <div class="toolbar">
      <div class="search">${svg('M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z')}<input type="text" id="trackQ" placeholder="Search students…" value="${esc(trackQ)}"/></div>
+     <button class="btn primary" id="trackAdd">${svg('M12 5v14M5 12h14')} Add student</button>
      ${ROLE!=="teacher"?`<button class="btn" onclick="go('funfriday')">${svg('M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z')} Fun Friday list</button>`:""}
    </div>
 
@@ -1936,7 +1942,10 @@ RENDER.tracker=function(){
        ${isThisWeek?`<td style="text-align:right;white-space:nowrap">
          <button class="btn sm" data-tardy="${r.st.id}">+ Tardy</button>
          <button class="btn sm" data-uniform="${r.st.id}">+ Uniform</button></td>`:""}
-     </tr>`).join(""):`<tr><td colspan="6" class="empty">${trackQ?"No students match.":"No students on the roster yet."}</td></tr>`}</tbody>
+     </tr>`).join(""):`<tr><td colspan="6" class="empty">
+       ${trackQ?`No students match “${esc(trackQ)}”.<div style="margin-top:12px"><button class="btn primary" id="trackAddQ">${svg('M12 5v14M5 12h14')} Add “${esc(trackQ)}” as a new student</button></div>`
+       :`No students on the roster yet.<div style="margin-top:12px"><button class="btn primary" id="trackAddQ">${svg('M12 5v14M5 12h14')} Add your first student</button></div>`}
+     </td></tr>`}</tbody>
    </table></div></div>
 
    ${isThisWeek?`<div class="card" style="margin-top:16px">
@@ -1961,6 +1970,9 @@ RENDER.tracker=function(){
   $$("#view-tracker [data-uniform]").forEach(b=>b.onclick=()=>logTracker(b.dataset.uniform,"uniform"));
   $$("#view-tracker [data-void]").forEach(b=>b.onclick=()=>voidTracker(b.dataset.void));
   $$("#view-tracker [data-open]").forEach(b=>b.onclick=()=>openStudent(b.dataset.open));
+  $("#trackAdd").onclick=()=>quickAddStudent("",()=>{trackQ="";RENDER.tracker();});
+  const taq=$("#trackAddQ");
+  if(taq)taq.onclick=()=>quickAddStudent(trackQ,()=>{trackQ="";RENDER.tracker();});
 };
 
 /* ---------- Fun Friday view ---------- */
@@ -2047,15 +2059,26 @@ function requestFunFridayFlag(instant,prefillId){
    <div class="modal-body">
      ${instant?"":`<p style="color:var(--muted);font-size:13px;margin:0 0 14px">This goes to Admin and the Behavior Team for approval. The student is not on the list until it's approved.</p>`}
      <div class="field"><label>Student</label>
-       <select id="ffStu">${scope.map(x=>`<option value="${x.id}" ${x.id===prefillId?"selected":""}>${esc(x.name)} — Gr ${esc(x.grade||"")}</option>`).join("")}</select></div>
+       ${scope.length?`<select id="ffStu">${scope.map(x=>`<option value="${x.id}" ${x.id===prefillId?"selected":""}>${esc(x.name)} — Gr ${esc(x.grade||"")}</option>`).join("")}</select>
+       <div class="help">Not listed? <a href="#" id="ffNew" style="font-weight:600">Add a new student</a></div>`
+       :`<div class="advise-note" style="background:var(--paper);padding:11px 13px;border-radius:9px">No students on the roster yet.
+         <div style="margin-top:9px"><button class="btn sm primary" id="ffNew">Add a student</button></div></div>`}
+     </div>
      <div class="field"><label>Reason</label>
        <textarea id="ffReason" placeholder="Why should this student miss Fun Friday this week?"></textarea>
        <div class="help">Tardies and uniform violations are counted automatically — this is for anything else.</div></div>
    </div>
    <div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button>
      <button class="btn primary" id="ffGo">${instant?"Add to list":"Send for approval"}</button></div>`);
+  const ffn=$("#ffNew");
+  if(ffn)ffn.onclick=e=>{
+    e.preventDefault();
+    quickAddStudent("",stu=>requestFunFridayFlag(instant,stu.id));
+  };
   $("#ffGo").onclick=async()=>{
-    const sid=$("#ffStu").value, st=DB.students.find(x=>x.id===sid);
+    const sel=$("#ffStu");
+    if(!sel){toast("Add a student first");return;}
+    const sid=sel.value, st=DB.students.find(x=>x.id===sid);
     const reason=$("#ffReason").value.trim();
     if(!st){toast("Pick a student");return;}
     if(!reason){toast("Add a reason");return;}
@@ -2890,6 +2913,55 @@ function teacherOptions(sel){
 }
 
 /* ---- add a student (available to every role) ---- */
+/* ---- quick add: name and grade only, everything else inferred ---- */
+function quickAddStudent(prefillName,afterSave){
+  const myGrade=(()=>{
+    if(!MY_CLASSROOM)return "";
+    const t=DB.teachers.find(x=>x.name===MY_CLASSROOM)||DB.students.find(x=>x.teacher===MY_CLASSROOM);
+    return t?(t.grade||""):"";
+  })();
+  const teachers=[...new Set(DB.teachers.map(t=>t.name).concat(DB.students.map(x=>x.teacher)).filter(Boolean))].sort();
+  const fixed=MY_CLASSROOM&&ROLE==="teacher";
+  modal(`
+   <div class="modal-head"><h3>Add student</h3><button class="x" onclick="closeModal()">×</button></div>
+   <div class="modal-body">
+     <div class="field"><label>Student name</label>
+       <input type="text" id="qaName" class="qe-input" value="${esc(prefillName||"")}" placeholder="First and last name"/></div>
+     <div class="grid g-2">
+       <div class="field"><label>Grade</label>
+         <select id="qaGrade" class="qe-input">${GRADES.map(g=>`<option ${g===myGrade?"selected":""}>${g}</option>`).join("")}</select></div>
+       ${fixed?`<div class="field"><label>Classroom</label>
+         <input type="text" class="qe-input" value="${esc(MY_CLASSROOM)}" disabled style="background:var(--paper);color:var(--muted)"/></div>`
+       :`<div class="field"><label>Teacher</label>
+         <select id="qaTeacher" class="qe-input"><option value="">Unassigned</option>${teachers.map(t=>`<option ${t===MY_CLASSROOM?"selected":""}>${esc(t)}</option>`).join("")}</select></div>`}
+     </div>
+     <div class="help" style="margin-top:2px">A student ID is assigned automatically. You can fill in room and other details later on the Roster tab.</div>
+   </div>
+   <div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button>
+     <button class="btn primary" id="qaGo">Add student</button></div>`);
+  const go=async()=>{
+    const name=$("#qaName").value.trim();
+    if(name.length<2){toast("Enter the student's name");return;}
+    const dupe=DB.students.find(x=>x.name.toLowerCase()===name.toLowerCase());
+    if(dupe&&!confirm(name+" is already on the roster (grade "+(dupe.grade||"?")+"). Add a second record anyway?")){
+      closeModal(); if(afterSave)afterSave(dupe); return;
+    }
+    const teacher=fixed?MY_CLASSROOM:($("#qaTeacher")?$("#qaTeacher").value:"");
+    const tRec=DB.teachers.find(x=>x.name===teacher);
+    const stu={id:nextStudentId(),name:name,grade:$("#qaGrade").value,
+      room:tRec&&tRec.room?tRec.room:"",teacher:teacher,active:true};
+    const saved=await addRecord("students",stu);
+    if(!saved)return;
+    if(teacher&&!DB.teachers.some(t=>t.name===teacher))
+      await addRecord("teachers",{id:newId(),name:teacher,grade:stu.grade,room:stu.room,active:true});
+    closeModal();toast(name+" added to the roster");
+    if(afterSave)afterSave(stu); else { RENDER[activeView]&&RENDER[activeView](); }
+  };
+  $("#qaGo").onclick=go;
+  $("#qaName").onkeydown=e=>{if(e.key==="Enter")go();};
+  setTimeout(()=>{const n=$("#qaName");if(n){n.focus();n.select();}},80);
+}
+
 function addStudent(prefillName,afterSave){
   const hasTeachers=DB.teachers.length||DB.students.some(s=>s.teacher);
   modal(`
@@ -3117,7 +3189,7 @@ boot();
 
 window.closeModal=closeModal;window.go=go;window.openStudent=openStudent;window.addConsequenceFor=addConsequenceFor;
 window.printStudent=printStudent;window.resetData=resetData;window.signOut=signOut;
-window.addStudent=addStudent;window.addTeacher=addTeacher;
+window.addStudent=addStudent;window.quickAddStudent=quickAddStudent;window.addTeacher=addTeacher;
 window.suspensionLetter=suspensionLetter;window.connectionCheck=connectionCheck;window.backupInfo=backupInfo;window.flushOutbox=flushOutbox;window.logTracker=logTracker;window.voidTracker=voidTracker;window.requestFunFridayFlag=requestFunFridayFlag;window.fullBackup=fullBackup;window.connectionCheck=connectionCheck;window.backupInfo=backupInfo;window.flushOutbox=flushOutbox;window.logTracker=logTracker;window.voidTracker=voidTracker;window.requestFunFridayFlag=requestFunFridayFlag;window.fullBackup=fullBackup;window.removalsModal=removalsModal;window.pendingCallsModal=pendingCallsModal;window.renderAlerts=renderAlerts;window.applyRole=applyRole;
 </script>
 </body>
