@@ -326,6 +326,16 @@ input,select,textarea{font-family:var(--body);font-size:15px}
 .dr-btn.maxed{border-color:var(--red);color:#a71f19;background:var(--red-tint)}
 @media(max-width:920px){.sp-grid{grid-template-columns:1fr}.dr-act{width:100%}.dr-btn{flex:1;justify-content:center}}
 
+.rm-opt{border:1.5px solid var(--line-strong);border-radius:12px;padding:14px 16px;margin-bottom:12px;cursor:pointer;transition:.12s}
+.rm-opt:hover{border-color:var(--teal);background:var(--teal-tint)}
+.rm-opt.danger:hover{border-color:var(--red);background:var(--red-tint)}
+.rm-head{display:flex;align-items:center;gap:9px;margin-bottom:6px;flex-wrap:wrap}
+.rm-head svg{width:18px;height:18px;flex:0 0 auto;color:var(--ink-soft)}
+.rm-head b{font-family:var(--disp);font-size:14.5px;font-weight:600}
+.rm-opt p{margin:0;font-size:12.5px;color:var(--ink-soft);line-height:1.55}
+.rm-opt.danger .rm-head svg{color:var(--red)}
+.btn[disabled]{opacity:.45;pointer-events:none}
+
 /* ---------- Weekly tracker ---------- */
 .week-bar{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 16px;box-shadow:var(--shadow)}
 .week-bar .wk{flex:1}
@@ -335,6 +345,7 @@ input,select,textarea{font-family:var(--body);font-size:15px}
   font-family:var(--disp);font-weight:700;font-size:15px;color:var(--muted)}
 .tally.some{background:var(--yellow-tint);color:#7a5c00}
 .tally.over{background:var(--red);color:#fff}
+tr.grp td{background:var(--ink);color:#fff;font-family:var(--disp);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.08em;padding:7px 14px}
 tr.row-lost td{background:var(--red-tint)}
 tr.row-lost:hover td{background:#f9d2cf}
 
@@ -437,6 +448,8 @@ textarea.qe-input{min-height:70px;resize:vertical}
 .alert-strip.activity{background:linear-gradient(100deg,#0a5f54 0%,#0d7d6e 50%,#12a48f 100%);box-shadow:0 6px 18px -8px rgba(13,125,110,.7);animation:alertIn .3s ease}
 .alert-strip.activity .abtn:hover{color:var(--teal-dark)}
 .alert-strip.pending{background:linear-gradient(100deg,#b8630f 0%,#e2952a 100%);box-shadow:0 6px 18px -8px rgba(226,149,42,.75)}
+.alert-strip.outnow{background:linear-gradient(100deg,#5b21b6 0%,#7c3aed 55%,#a855f7 100%);box-shadow:0 6px 18px -8px rgba(124,58,237,.7)}
+.alert-strip.outnow .abtn:hover{color:#5b21b6}
 .alert-strip.needhelp{background:linear-gradient(100deg,#6d28d9 0%,#9333ea 55%,#a855f7 100%);box-shadow:0 6px 18px -8px rgba(147,51,234,.7)}
 .alert-strip.needhelp .abtn:hover{color:#6d28d9}
 .radio-call{display:flex;align-items:center;gap:13px;background:#7a1410;color:#fff;border-radius:11px;padding:13px 15px;animation:radioPulse 1.8s ease-in-out infinite}
@@ -1229,6 +1242,28 @@ function go(id){
 }
 
 /* ============================================================
+   SEARCH BOXES
+   Re-rendering a view rebuilds its <input>, and calling .focus()
+   afterwards drops the caret at position 0 — which is why typed
+   letters came out backwards. Save the caret, restore it after.
+   ============================================================ */
+function wireSearch(id,setValue,rerender){
+  const el=document.getElementById(id);
+  if(!el)return;
+  el.oninput=function(e){
+    const pos=e.target.selectionStart;
+    const val=e.target.value;
+    setValue(val);
+    rerender();
+    const again=document.getElementById(id);
+    if(again){
+      again.focus();
+      try{ again.setSelectionRange(pos,pos); }catch(err){}
+    }
+  };
+}
+
+/* ============================================================
    VIEW RENDERERS
    ============================================================ */
 const RENDER={};
@@ -1776,6 +1811,121 @@ async function connectionCheck(){
 }
 
 /* ============================================================
+   TIME OUT OF CLASS
+   The return time is stored inside the existing follow_up field as
+   a tagged prefix — "[back 10:15 · 45 min out · Saido]" — so no new
+   database column is needed and the Sheets backup picks it up as-is
+   under the Follow-up heading.
+   ============================================================ */
+const BACK_RE=/^\[back (\d{1,2}:\d{2})(?: · ([^·\]]*?))?(?: · ([^\]]*))?\]\s*/;
+
+function getReturn(inc){
+  const m=BACK_RE.exec(inc.followUp||"");
+  if(!m)return null;
+  return {time:m[1],by:(m[3]||"").trim()};
+}
+function followUpText(inc){
+  return String(inc.followUp||"").replace(BACK_RE,"").trim();
+}
+function minsBetween(a,b){
+  if(!a||!b)return null;
+  const pa=String(a).split(":").map(Number), pb=String(b).split(":").map(Number);
+  if(pa.length<2||pb.length<2||isNaN(pa[0])||isNaN(pb[0]))return null;
+  let m=(pb[0]*60+pb[1])-(pa[0]*60+pa[1]);
+  if(m<0)m+=24*60;
+  if(m>8*60)return null;          // implausible for a school day
+  return m;
+}
+function minutesOut(inc){
+  if(!inc.removedFromClass)return null;
+  const r=getReturn(inc);
+  return r?minsBetween(inc.time,r.time):null;
+}
+function openRemovalsOut(){
+  return DB.incidents.filter(i=>i.removedFromClass&&!getReturn(i)&&i.date>=daysAgo(2));
+}
+function elapsedSince(inc){
+  if(inc.date!==todayStr())return null;
+  return minsBetween(inc.time,nowTime());
+}
+function fmtMins(m){
+  if(m===null||m===undefined)return "—";
+  if(m<60)return m+" min";
+  const h=Math.floor(m/60), r=m%60;
+  return h+"h"+(r?" "+r+"m":"");
+}
+function totalMinutesOut(list){
+  let total=0,counted=0,open=0;
+  (list||[]).forEach(i=>{
+    if(!i.removedFromClass)return;
+    const m=minutesOut(i);
+    if(m===null){open++;return;}
+    total+=m;counted++;
+  });
+  return {total:total,counted:counted,open:open,avg:counted?Math.round(total/counted):0};
+}
+/** Times a student has been removed, and the learning time it cost. */
+function outOfClassSummary(studentId){
+  const list=DB.incidents.filter(i=>i.student===studentId&&i.removedFromClass);
+  const t=totalMinutesOut(list);
+  return {times:list.length,total:t.total,avg:t.avg,open:t.open};
+}
+async function markSentBack(incidentId,time){
+  const inc=DB.incidents.find(x=>x.id===incidentId);if(!inc)return;
+  const who=ME?ME.name:USERS[ROLE].name;
+  const mins=minsBetween(inc.time,time);
+  const rest=followUpText(inc);
+  const tag="[back "+time+" · "+(mins===null?"time unclear":fmtMins(mins)+" out")+" · "+who+"]";
+  await updateRecord("incidents",incidentId,{followUp:(tag+(rest?" "+rest:""))});
+  toast(inc.studentName.split(" ")[0]+" back in class · "+fmtMins(mins)+" of learning time missed");
+  RENDER[activeView]&&RENDER[activeView]();renderNav();renderAlerts();
+}
+function sendBackPrompt(incidentId){
+  const inc=DB.incidents.find(x=>x.id===incidentId);if(!inc)return;
+  const live=elapsedSince(inc);
+  modal(`
+   <div class="modal-head"><h3>Sent back to class</h3><button class="x" onclick="closeModal()">×</button></div>
+   <div class="modal-body">
+     <p style="font-size:13.5px;margin:0 0 14px"><b>${esc(inc.studentName)}</b> left class at <b>${esc(inc.time)}</b> on ${fmtDate(inc.date)}${live!==null?` — <b>${fmtMins(live)}</b> ago`:""}.</p>
+     <div class="field"><label>Time returned to class</label>
+       <input type="time" id="sbTime" value="${nowTime()}" style="width:100%;border:1.5px solid var(--line-strong);border-radius:10px;padding:11px 13px;font-size:15px"/>
+       <div class="help">Adjust if they went back earlier than now.</div></div>
+     <div id="sbCalc" style="background:var(--teal-tint);color:var(--teal-dark);padding:11px 13px;border-radius:9px;font-weight:600;font-size:13.5px"></div>
+   </div>
+   <div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button>
+     <button class="btn primary" id="sbGo">Mark returned</button></div>`);
+  const calc=()=>{
+    const m=minsBetween(inc.time,$("#sbTime").value);
+    $("#sbCalc").textContent=(m===null)?"Check the time — that doesn't look right.":fmtMins(m)+" of learning time missed";
+  };
+  $("#sbTime").oninput=calc;calc();
+  $("#sbGo").onclick=async()=>{
+    const t=$("#sbTime").value;
+    if(minsBetween(inc.time,t)===null){toast("Check the return time");return;}
+    closeModal();await markSentBack(incidentId,t);
+  };
+}
+function outNowModal(){
+  const list=openRemovalsOut().sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+  modal(`
+   <div class="modal-head" style="background:linear-gradient(100deg,#5b21b6,#a855f7);color:#fff;border-bottom:0">
+     <div><h3 style="color:#fff">Out of class</h3>
+     <div style="font-size:12.5px;opacity:.93">Mark each student as they return so lost learning time is counted</div></div>
+     <button class="x" onclick="closeModal()" style="background:rgba(255,255,255,.22);color:#fff">×</button></div>
+   <div class="modal-body" style="padding:0">
+     ${list.length?list.map(i=>{const live=elapsedSince(i);return `<div class="removal-row">
+       <div class="av" style="width:34px;height:34px;border-radius:9px;background:#ede9fe;color:#5b21b6;display:grid;place-items:center;font-family:var(--disp);font-weight:600;font-size:12px">${initials(i.studentName)}</div>
+       <div class="rl"><div style="font-weight:600;font-size:14px">${esc(i.studentName)}</div>
+         <div style="font-size:12px;color:var(--muted)">${esc(i.category)} · left ${esc(i.time)} · ${esc(i.teacher||"")}${i.date!==todayStr()?" · "+fmtDateShort(i.date):""}</div></div>
+       <span class="pill ${live!==null&&live>=30?"s4":"s3"}">${live!==null?fmtMins(live)+" out":"earlier"}</span>
+       <button class="btn sm primary" data-sb="${i.id}">Sent back</button>
+     </div>`;}).join(""):`<div class="empty">Everyone is back in class.</div>`}
+   </div>
+   <div class="modal-foot"><button class="btn primary" onclick="closeModal()">Done</button></div>`);
+  $$("#modal [data-sb]").forEach(b=>b.onclick=()=>{closeModal();sendBackPrompt(b.dataset.sb);});
+}
+
+/* ============================================================
    WEEKLY TARDY & UNIFORM TRACKER  +  NO FUN FRIDAY LIST
    Policy: 1st tardy recorded · 2nd tardy loses Fun Friday.
            1st uniform recorded · 2nd uniform loses Fun Friday.
@@ -1809,10 +1959,15 @@ function tallyFor(studentId,weekStart){
   return {tardy:tardy,uniform:uniform};
 }
 /** Automatic policy exclusion — no approval needed. */
+function removalsThisWeek(studentId,weekStart){
+  return DB.incidents.filter(i=>i.student===studentId&&i.removedFromClass&&mondayOf(i.date)===weekStart);
+}
 function autoExcluded(studentId,weekStart){
   const t=tallyFor(studentId,weekStart), reasons=[];
   if(t.tardy>=FF_LIMIT)reasons.push(t.tardy+" tardies");
   if(t.uniform>=FF_LIMIT)reasons.push(t.uniform+" uniform violations");
+  const rem=removalsThisWeek(studentId,weekStart);
+  if(rem.length)reasons.push("removed from class"+(rem.length>1?" ("+rem.length+"x)":""));
   return reasons.length?reasons.join(" · "):null;
 }
 function weekFlags(weekStart,status){
@@ -1889,15 +2044,20 @@ async function voidTracker(id){
 }
 
 /* ---------- Tracker view ---------- */
-let trackWeek=null, trackQ="";
+let trackWeek=null, trackQ="", trackSort="name";
 RENDER.tracker=function(){
   const el=$("#view-tracker");
   const ws=trackWeek||mondayOf(todayStr());
   const isThisWeek = ws===mondayOf(todayStr());
   const scope=DB.students.filter(x=>ROLE!=="teacher"||!MY_CLASSROOM||x.teacher===MY_CLASSROOM)
     .filter(x=>x.name.toLowerCase().includes(trackQ.toLowerCase()));
+  const gR=g=>{const i=GRADES.indexOf(String(g));return i<0?99:i;};
   const rows=scope.map(st=>({st:st,t:tallyFor(st.id,ws),lost:autoExcluded(st.id,ws)}))
-    .sort((a,b)=>(b.lost?1:0)-(a.lost?1:0) || (b.t.tardy+b.t.uniform)-(a.t.tardy+a.t.uniform) || a.st.name.localeCompare(b.st.name));
+    .sort((a,b)=>{
+      if(trackSort==="name")return a.st.name.localeCompare(b.st.name);
+      if(trackSort==="grade")return gR(a.st.grade)-gR(b.st.grade)||a.st.name.localeCompare(b.st.name);
+      return (b.lost?1:0)-(a.lost?1:0)||(b.t.tardy+b.t.uniform)-(a.t.tardy+a.t.uniform)||a.st.name.localeCompare(b.st.name);
+    });
   const lostCount=rows.filter(r=>r.lost).length;
   const totT=rows.reduce((n,r)=>n+r.t.tardy,0), totU=rows.reduce((n,r)=>n+r.t.uniform,0);
   const prevWeek=(()=>{const d=new Date(ws+"T00:00:00");d.setDate(d.getDate()-7);return d.toISOString().slice(0,10);})();
@@ -1924,6 +2084,11 @@ RENDER.tracker=function(){
 
    <div class="toolbar">
      <div class="search">${svg('M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z')}<input type="text" id="trackQ" placeholder="Search students…" value="${esc(trackQ)}"/></div>
+     <div class="seg" id="trackSort">
+       <button data-s="name" class="${trackSort==="name"?"on":""}">A–Z</button>
+       <button data-s="grade" class="${trackSort==="grade"?"on":""}">By grade</button>
+       <button data-s="strikes" class="${trackSort==="strikes"?"on":""}">Strikes first</button>
+     </div>
      <button class="btn primary" id="trackAdd">${svg('M12 5v14M5 12h14')} Add student</button>
      ${ROLE!=="teacher"?`<button class="btn" onclick="go('funfriday')">${svg('M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z')} Fun Friday list</button>`:""}
    </div>
@@ -1965,11 +2130,12 @@ RENDER.tracker=function(){
   $("#wPrev").onclick=()=>{trackWeek=prevWeek;RENDER.tracker();};
   $("#wNext").onclick=()=>{if(!isThisWeek){trackWeek=nextWeek;RENDER.tracker();}};
   const wn=$("#wNow");if(wn)wn.onclick=()=>{trackWeek=null;RENDER.tracker();};
-  $("#trackQ").oninput=e=>{trackQ=e.target.value;RENDER.tracker();$("#trackQ").focus();};
+  wireSearch("trackQ",v=>{trackQ=v;},()=>RENDER.tracker());
   $$("#view-tracker [data-tardy]").forEach(b=>b.onclick=()=>logTracker(b.dataset.tardy,"tardy"));
   $$("#view-tracker [data-uniform]").forEach(b=>b.onclick=()=>logTracker(b.dataset.uniform,"uniform"));
   $$("#view-tracker [data-void]").forEach(b=>b.onclick=()=>voidTracker(b.dataset.void));
   $$("#view-tracker [data-open]").forEach(b=>b.onclick=()=>openStudent(b.dataset.open));
+  $$("#trackSort button").forEach(b=>b.onclick=()=>{trackSort=b.dataset.s;RENDER.tracker();});
   $("#trackAdd").onclick=()=>quickAddStudent("",()=>{trackQ="";RENDER.tracker();});
   const taq=$("#trackAddQ");
   if(taq)taq.onclick=()=>quickAddStudent(trackQ,()=>{trackQ="";RENDER.tracker();});
@@ -2091,6 +2257,138 @@ function requestFunFridayFlag(instant,prefillId){
     toast(instant?st.name+" added to the list":"Request sent for approval");
     RENDER[activeView]&&RENDER[activeView]();renderNav();
   };
+}
+
+/* ============================================================
+   CUMULATIVE STUDENT REPORT — rebuilds from live data each time
+   ============================================================ */
+function studentReport(studentId){
+  const st=DB.students.find(x=>x.id===studentId);if(!st)return;
+  const incs=studentIncidents(studentId);
+  const cons=studentConsequences(studentId);
+  const ws=mondayOf(todayStr());
+  const trk=DB.tracker.filter(e=>e.student===studentId&&!e.voided);
+  const out=outOfClassSummary(studentId);
+  const cats={};incs.forEach(i=>cats[i.category]=(cats[i.category]||0)+1);
+  const topCats=Object.entries(cats).sort((a,b)=>b[1]-a[1]);
+  const last30=incs.filter(i=>i.date>=daysAgo(30)).length;
+  const prev30=incs.filter(i=>i.date>=daysAgo(60)&&i.date<daysAgo(30)).length;
+  const dir=last30>prev30?"increasing":last30<prev30?"decreasing":"steady";
+  const ffNow=(typeof funFridayStatus==="function")?funFridayStatus(studentId):{out:!!autoExcluded(studentId,ws),reason:autoExcluded(studentId,ws)||""};
+  const sev={1:0,2:0,3:0,4:0};incs.forEach(i=>sev[i.severity]=(sev[i.severity]||0)+1);
+  const wk=tallyFor(studentId,ws);
+  const tTot=trk.filter(e=>e.type==="tardy").length, uTot=trk.filter(e=>e.type==="uniform").length;
+  const L="_".repeat(16);
+
+  const html=`<!DOCTYPE html><html><head><meta charset="utf-8"/>
+  <title>Behavior Record — ${esc(st.name)}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    @page{size:letter;margin:.6in}
+    body{font-family:Inter,Arial,sans-serif;color:#16262b;font-size:10.5pt;line-height:1.5;margin:0;padding:24px;background:#f1f5f4}
+    .sheet{background:#fff;padding:34px 38px;max-width:7.3in;margin:0 auto;box-shadow:0 6px 24px -12px rgba(0,0,0,.25)}
+    .hd{display:flex;align-items:center;gap:15px;border-bottom:2px solid #16262b;padding-bottom:13px;margin-bottom:16px}
+    .hd img{width:62px;height:62px}
+    .hd h1{font-size:15.5pt;margin:0 0 2px}
+    .hd .sub{font-size:10pt;color:#3f5257}
+    .hd .meta{margin-left:auto;text-align:right;font-size:9pt;color:#3f5257}
+    h2{font-size:11.5pt;margin:20px 0 8px;padding-bottom:4px;border-bottom:1px solid #cdd8d6}
+    table{width:100%;border-collapse:collapse;font-size:9.5pt;margin-top:4px}
+    th{text-align:left;background:#16262b;color:#fff;padding:6px 8px;font-size:8.5pt;text-transform:uppercase;letter-spacing:.05em}
+    td{padding:6px 8px;border-bottom:1px solid #e2e8e7;vertical-align:top}
+    tr:nth-child(even) td{background:#f8faf9}
+    .kpi td{text-align:center;font-size:9pt;border:1px solid #e2e8e7}
+    .kpi .n{font-size:17pt;font-weight:700;display:block;line-height:1.2}
+    .kpi .warn{color:#a71f19}
+    .tag{display:inline-block;background:#e3f2ef;color:#0a5f54;border-radius:5px;padding:1px 7px;font-size:8.5pt;font-weight:600;margin:1px 2px 1px 0}
+    .s3{background:#fce6d5;color:#9c4a10}.s4{background:#fbe0de;color:#a71f19}
+    .note{background:#f8faf9;border-left:3px solid #0d7d6e;padding:10px 13px;font-size:9.5pt;margin:11px 0}
+    .sig{margin-top:18px;border-top:2px solid #16262b;padding-top:13px}
+    .sig td{border:0;padding:9px 6px;white-space:nowrap}
+    .foot{margin-top:18px;font-size:8.5pt;color:#6b7c80;text-align:center;border-top:1px solid #cdd8d6;padding-top:9px}
+    .noprint{text-align:center;max-width:7.3in;margin:0 auto 16px}
+    .noprint button{background:#0d7d6e;color:#fff;border:0;padding:11px 22px;border-radius:9px;font-size:14px;font-weight:600;font-family:Inter,sans-serif;cursor:pointer}
+    .noprint span{display:block;color:#3f5257;font-size:12.5px;margin-top:8px}
+    @media print{body{background:#fff;padding:0}.sheet{box-shadow:none;padding:0;max-width:none}.noprint{display:none}h2{page-break-after:avoid}tr{page-break-inside:avoid}}
+  </style></head><body>
+  <div class="noprint"><button onclick="window.print()">Print or save as PDF</button>
+    <span>This report rebuilds from current data every time you open it.</span></div>
+  <div class="sheet">
+    <div class="hd">
+      <img src="${LOGO}" alt="Bultum Academy"/>
+      <div><h1>Student Behavior Record</h1>
+        <div class="sub"><b>${esc(st.name)}</b> &middot; Grade ${esc(st.grade||"—")} &middot; ${esc(st.teacher||"Unassigned")}${st.room?" &middot; "+esc(st.room):""}</div></div>
+      <div class="meta">Student ID: ${esc(st.id)}<br/>Generated ${fmtDate(todayStr())}<br/>School year 2026–2027</div>
+    </div>
+
+    <h2>Summary</h2>
+    <table class="kpi"><tr>
+      <td><span class="n">${incs.length}</span>Total incidents</td>
+      <td><span class="n ${last30>prev30&&last30?"warn":""}">${last30}</span>Last 30 days</td>
+      <td><span class="n ${out.times?"warn":""}">${out.times}</span>Times out of class</td>
+      <td><span class="n ${out.total>=60?"warn":""}" style="font-size:13pt">${fmtMins(out.total)}</span>Learning time lost</td>
+      <td><span class="n">${cons.length}</span>Interventions</td>
+    </tr></table>
+    <div class="note">
+      To date, ${esc(st.name.split(" ")[0])} has <b>${incs.length}</b> documented incident${incs.length===1?"":"s"},
+      <b>${last30}</b> of them in the last 30 days — a <b>${dir}</b> pattern against the 30 days prior.
+      ${out.times?`There ${out.times===1?"has":"have"} been <b>${out.times}</b> removal${out.times===1?"":"s"} from class, costing roughly <b>${fmtMins(out.total)}</b> of instruction${out.avg?` (about ${fmtMins(out.avg)} each)`:""}${out.open?`; ${out.open} removal${out.open===1?"":"s"} ${out.open===1?"has":"have"} no recorded return time.`:"."}`:"There have been no removals from class."}
+      ${topCats.length?` The most frequent pattern is <b>${esc(topCats[0][0])}</b>.`:""}
+    </div>
+
+    ${topCats.length?`<h2>Behavior patterns</h2>
+    <div>${topCats.map(([c,n])=>`<span class="tag ${(CAT_SEV[c]||2)>=4?"s4":(CAT_SEV[c]||2)>=3?"s3":""}">${esc(c)} — ${n}</span>`).join("")}</div>
+    <table style="margin-top:9px"><tr><th>Minor</th><th>Moderate</th><th>Serious</th><th>Critical</th></tr>
+      <tr><td>${sev[1]||0}</td><td>${sev[2]||0}</td><td>${sev[3]||0}</td><td>${sev[4]||0}</td></tr></table>`:""}
+
+    <h2>Attendance, uniform &amp; Fun Friday</h2>
+    <table>
+      <tr><th>Measure</th><th>This week</th><th>Year to date</th><th>Status</th></tr>
+      <tr><td>Tardies</td><td>${wk.tardy}</td><td>${tTot}</td><td>${wk.tardy>=FF_LIMIT?"<b>At limit</b>":"Within limit"}</td></tr>
+      <tr><td>Uniform violations</td><td>${wk.uniform}</td><td>${uTot}</td><td>${wk.uniform>=FF_LIMIT?"<b>At limit</b>":"Within limit"}</td></tr>
+      <tr><td>Fun Friday this week</td><td colspan="3">${ffNow.out?`<b>Not participating</b> — ${esc(ffNow.reason||"")}`:(ffNow.pending?"Referral pending review":"Eligible")}</td></tr>
+    </table>
+
+    ${incs.length?`<h2>Incident history</h2>
+    <table>
+      <tr><th>Date</th><th>Behavior</th><th>Severity</th><th>Where</th><th>Out of class</th><th>Family contacted</th></tr>
+      ${incs.map(i=>{const r=getReturn(i),m=minutesOut(i);return `<tr>
+        <td>${fmtDateShort(i.date)}<div style="font-size:8pt;color:#7b8c90">${esc(i.time||"")}</div></td>
+        <td>${esc(i.category)}${i.description?`<div style="font-size:8.5pt;color:#3f5257">${esc(i.description)}</div>`:""}</td>
+        <td>${esc(SEV[i.severity]||"")}</td>
+        <td>${esc(i.location||"—")}</td>
+        <td>${i.removedFromClass?(m!==null?`<b>${fmtMins(m)}</b><div style="font-size:8pt;color:#7b8c90">back ${esc(r.time)}</div>`:"removed · no return time"):"—"}</td>
+        <td>${i.removedFromClass?(i.parentContactStatus==="called"?"Yes":i.parentContactStatus==="will_call"?"Planned":i.parentContactStatus==="needs_help"?"Team handling":"Not logged"):"—"}</td>
+      </tr>`;}).join("")}
+    </table>`:`<h2>Incident history</h2><p style="color:#6b7c80">No incidents on record.</p>`}
+
+    ${cons.length?`<h2>Interventions and consequences</h2>
+    <table><tr><th>Date</th><th>Intervention</th><th>Duration</th><th>Reason</th><th>Status</th><th>Assigned by</th></tr>
+      ${cons.map(c=>`<tr><td>${fmtDateShort(c.date)}</td><td>${esc(c.type)}</td><td>${esc(c.duration||"—")}</td>
+      <td>${esc(c.reason||"—")}</td><td>${esc(c.status||"")}</td><td>${esc(c.assignedBy||"—")}</td></tr>`).join("")}
+    </table>`:""}
+
+    <div class="sig">
+      <h2 style="margin-top:0;border:0;padding:0">Conference record</h2>
+      <p style="font-size:9.5pt;color:#3f5257;margin:0 0 6px">Signing confirms this record was reviewed together, not agreement with every entry.</p>
+      <table>
+        <tr><td><b>Student</b></td><td>${L}</td><td><b>Date</b></td><td>${"_".repeat(9)}</td></tr>
+        <tr><td><b>Parent/Guardian</b></td><td>${L}</td><td><b>Date</b></td><td>${"_".repeat(9)}</td></tr>
+        <tr><td><b>Teacher</b></td><td>${L}</td><td><b>Date</b></td><td>${"_".repeat(9)}</td></tr>
+        <tr><td><b>Behavior Team</b></td><td>${L}</td><td><b>Date</b></td><td>${"_".repeat(9)}</td></tr>
+      </table>
+      <p style="font-size:9.5pt;margin-top:11px"><b>Next steps agreed:</b></p>
+      <div style="border-bottom:1px solid #16262b;height:19px"></div>
+      <div style="border-bottom:1px solid #16262b;height:19px"></div>
+    </div>
+    <div class="foot">Bultum Academy Charter School &middot; Columbia Heights, MN &middot; ${SCHOOL_PHONE}<br/>
+      Confidential student record — protected education data. Generated by ${esc(ME?ME.name:"staff")} on ${fmtDate(todayStr())}.</div>
+  </div></body></html>`;
+
+  const w=window.open("","_blank");
+  if(!w){toast("Allow pop-ups to open the report");return;}
+  w.document.write(html);w.document.close();
+  toast("Report generated for "+st.name);
 }
 
 /* ============================================================
@@ -2343,6 +2641,17 @@ function renderAlerts(){
       <button class="abtn" id="alertView">Review</button>
     </div>`;
   }
+  const outNow=openRemovalsOut().filter(i=>i.date===todayStr());
+  if(outNow.length){
+    const mins=outNow.map(i=>elapsedSince(i)).filter(x=>x!==null);
+    const worst=mins.length?Math.max.apply(null,mins):null;
+    html+=`<div class="alert-strip outnow">
+      <span class="ping"></span>
+      <div class="atxt"><b>${outNow.length} student${outNow.length===1?"":"s"} out of class right now</b>
+        <span>${outNow.map(i=>esc(i.studentName)+(elapsedSince(i)!==null?" ("+fmtMins(elapsedSince(i))+")":"")).join(" · ")}${worst!==null&&worst>=30?" — learning time adding up":""}</span></div>
+      <button class="abtn" id="outView">Send back</button>
+    </div>`;
+  }
   const help=needsTeamCall();
   if(help.length){
     html+=`<div class="alert-strip needhelp">
@@ -2356,6 +2665,7 @@ function renderAlerts(){
   const av=$("#actView"); if(av)av.onclick=activityModal;
   const rv=$("#alertView"); if(rv)rv.onclick=removalsModal;
   const hv=$("#helpView"); if(hv)hv.onclick=removalsModal;
+  const ov=$("#outView"); if(ov)ov.onclick=outNowModal;
 }
 function removalsModal(){
   const list=openRemovals();
@@ -2371,6 +2681,10 @@ function removalsModal(){
          <div style="font-weight:600;font-size:14px">${esc(i.studentName)} <span style="color:var(--muted);font-weight:500">· Gr ${esc(i.grade)}</span></div>
          <div style="font-size:12px;color:var(--muted)">${esc(i.category)} · ${esc(i.teacher)} · ${fmtDateShort(i.date)} ${i.time}</div>
        </div>
+       ${(()=>{const r=getReturn(i),m=minutesOut(i),live=elapsedSince(i);
+         return r?`<span class="pill neutral">Back ${esc(r.time)} · ${fmtMins(m)} out</span>`
+                 :`<span class="pill s4">${live!==null?"Out "+fmtMins(live):"Still out"}</span>`;})()}
+       ${!getReturn(i)?`<button class="btn sm primary" data-sendback="${i.id}">Sent back</button>`:""}
        <span class="pill ${(PC[i.parentContactStatus]||PC[""]).pill}">${(PC[i.parentContactStatus]||PC[""]).label}${i.parentContactStatus==="will_call"&&i.parentContactWhen?": "+esc(i.parentContactWhen):""}</span>
        ${i.parentContactStatus!=="called"?`<button class="btn sm" data-teamcalled="${i.id}">Log call</button>`:""}
        <button class="btn sm" data-ack="${i.id}">Acknowledge</button>
@@ -2383,6 +2697,7 @@ function removalsModal(){
     await updateRecord("incidents",b.dataset.ack,{acknowledged:true});
     renderAlerts();renderNav();removalsModal();
   });
+  $$("#modal [data-sendback]").forEach(b=>b.onclick=()=>{closeModal();sendBackPrompt(b.dataset.sendback);});
   $$("#modal [data-teamcalled]").forEach(b=>b.onclick=async()=>{
     await updateRecord("incidents",b.dataset.teamcalled,{parentContacted:true,parentContactStatus:"called",
       parentContactNote:"Called by "+(ME?ME.name:"team")});
@@ -2410,22 +2725,37 @@ function renderRecent(){
 
 /* ---- 2. Student Profiles ---- */
 let studentQuery="";
+let studentSort="name";
 RENDER.students=function(){
   const el=$("#view-students");
+  const gRank=g=>{const i=GRADES.indexOf(String(g));return i<0?99:i;};
+  const q=studentQuery.trim().toLowerCase();
   const list=DB.students
     .filter(s=>ROLE!=="teacher"||!MY_CLASSROOM||s.teacher===MY_CLASSROOM)
     .map(s=>({...s,count:studentIncidents(s.id).length}))
-    .filter(s=>s.name.toLowerCase().includes(studentQuery.toLowerCase()))
-    .sort((a,b)=>b.count-a.count||a.name.localeCompare(b.name));
+    .filter(s=>!q||s.name.toLowerCase().includes(q)||String(s.id).toLowerCase().includes(q))
+    .sort((a,b)=>{
+      if(studentSort==="name")return a.name.localeCompare(b.name);
+      if(studentSort==="grade")return gRank(a.grade)-gRank(b.grade)||a.name.localeCompare(b.name);
+      return b.count-a.count||a.name.localeCompare(b.name);
+    });
   el.innerHTML=`
    <div class="page-head"><h2>Student behavior profiles</h2><p>${ROLE==="teacher"?"Students in your classroom.":"Every student’s complete behavioral history."} Tap a name to open the full record.</p></div>
    <div class="toolbar">
-     <div class="search">${svg('M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z')}<input type="text" id="stuQ" placeholder="Search students…" value="${esc(studentQuery)}"/></div>
+     <div class="search">${svg('M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z')}<input type="text" id="stuQ" placeholder="Search by name…" value="${esc(studentQuery)}"/></div>
+     <div class="seg" id="stuSort">
+       <button data-s="name" class="${studentSort==="name"?"on":""}">A–Z</button>
+       <button data-s="grade" class="${studentSort==="grade"?"on":""}">By grade</button>
+       <button data-s="incidents" class="${studentSort==="incidents"?"on":""}">Most incidents</button>
+     </div>
      <button class="btn primary" id="addStuBtn">${svg('M12 5v14M5 12h14')} Add student</button>
    </div>
    <div class="card"><div style="overflow-x:auto"><table class="tbl">
      <thead><tr><th>Student</th><th>Grade</th><th>Teacher</th><th>Incidents (YTD)</th><th>Last incident</th><th></th></tr></thead>
-     <tbody>${list.length?list.map(s=>{const last=studentIncidents(s.id)[0];return `<tr class="clickable" data-id="${s.id}">
+     <tbody>${list.length?list.map((s,idx)=>{const last=studentIncidents(s.id)[0];
+        const hdr=(studentSort==="grade"&&(idx===0||list[idx-1].grade!==s.grade))
+          ? `<tr class="grp"><td colspan="6">Grade ${esc(s.grade||"—")}</td></tr>`:"";
+        return hdr+`<tr class="clickable" data-id="${s.id}">
         <td><div style="display:flex;align-items:center;gap:10px"><div class="av" style="width:32px;height:32px;border-radius:8px;background:var(--teal-tint);color:var(--teal-dark);display:grid;place-items:center;font-family:var(--disp);font-weight:600;font-size:12px">${initials(s.name)}</div><b>${esc(s.name)}</b></div></td>
         <td>${s.grade}</td><td>${esc(s.teacher)}</td>
         <td><span class="num">${s.count}</span></td>
@@ -2433,8 +2763,9 @@ RENDER.students=function(){
         <td style="text-align:right;color:var(--muted)">${svg('M9 18l6-6-6-6')}</td></tr>`;}).join("")
         :`<tr><td colspan="6" class="empty">${studentQuery?`No students match “${esc(studentQuery)}”.`:"No students yet — use <b>Add student</b> to begin."}</td></tr>`}</tbody>
    </table></div></div>`;
-  $("#stuQ").oninput=e=>{studentQuery=e.target.value;RENDER.students();$("#stuQ").focus();};
+  wireSearch("stuQ",v=>{studentQuery=v;},()=>RENDER.students());
   $("#addStuBtn").onclick=()=>addStudent("",()=>RENDER.students());
+  $$("#stuSort button").forEach(b=>b.onclick=()=>{studentSort=b.dataset.s;RENDER.students();});
   $$("#view-students tr.clickable").forEach(r=>r.onclick=()=>openStudent(r.dataset.id));
 };
 function openStudent(id){
@@ -2466,7 +2797,7 @@ function openStudent(id){
           <div class="when">${fmtDate(i.date)} · ${i.time} · ${esc(i.location)}</div>
           <div class="what">${esc(i.category)} <span class="pill s${i.severity}" style="margin-left:6px">${SEV[i.severity]}</span></div>
           <div class="desc">${esc(i.description||"")}</div>
-          ${i.removedFromClass?`<div style="margin-top:4px"><span class="pill s4">Removed from class</span> <span class="pill ${(PC[i.parentContactStatus]||PC[""]).pill}">${(PC[i.parentContactStatus]||PC[""]).label}${i.parentContactStatus==="will_call"&&i.parentContactWhen?": "+esc(i.parentContactWhen):""}</span></div>`:""}
+          ${i.removedFromClass?`<div style="margin-top:4px"><span class="pill s4">Removed from class</span> ${(()=>{const m=minutesOut(i);return m!==null?`<span class="pill neutral">${fmtMins(m)} out</span>`:`<span class="pill s3">no return time</span>`;})()} <span class="pill ${(PC[i.parentContactStatus]||PC[""]).pill}">${(PC[i.parentContactStatus]||PC[""]).label}${i.parentContactStatus==="will_call"&&i.parentContactWhen?": "+esc(i.parentContactWhen):""}</span></div>`:""}
           ${i.staffResponse?`<div class="desc" style="color:var(--muted);font-size:12px;margin-top:2px">Staff: ${esc(i.staffResponse)}${i.supportRequested?" · support requested":""}</div>`:""}
         </div>`).join("")}</div>`:`<div class="empty">No incidents on record — a positive sign.</div>`}
       ${cons.length?`<h4 style="font-size:14px;margin:22px 0 10px">Interventions & consequences</h4>
@@ -2474,7 +2805,7 @@ function openStudent(id){
         ${cons.map(c=>`<tr><td><b>${esc(c.type)}</b></td><td>${fmtDateShort(c.date)}</td><td>${esc(c.reason)}</td><td><span class="pill ${c.status==="Completed"?"teal":"neutral"}">${esc(c.status)}</span></td></tr>`).join("")}
         </tbody></table>`:""}
     </div>
-    <div class="modal-foot"><button class="btn" onclick="printStudent('${s.id}')">${svg('M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z')} Print record</button><button class="btn primary" onclick="closeModal()">Done</button></div>
+    <div class="modal-foot"><button class="btn primary" onclick="studentReport('${s.id}')">${svg('M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8')} Full report</button><button class="btn" onclick="printStudent('${s.id}')">${svg('M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z')} Print record</button><button class="btn primary" onclick="closeModal()">Done</button></div>
   `);
 }
 function printStudent(id){toast("Use your browser’s print dialog to save as PDF");setTimeout(()=>window.print(),400);}
@@ -2583,6 +2914,7 @@ RENDER.support=function(){
      <div class="card card-pad"><h3 style="font-size:15px;margin-bottom:4px">8‑week trend</h3><p style="color:var(--muted);font-size:12.5px;margin:0 0 10px">Support requests per week</p>
        <canvas id="supTrend" height="150"></canvas>
        <h4 style="font-size:13px;margin:18px 0 8px">Top reasons (30d)</h4>
+       ${topReasons.length?`<canvas id="supReasons" height="${Math.max(130,topReasons.length*30)}" style="margin-bottom:10px"></canvas>`:""}
        ${topReasons.length?topReasons.map(([r,n])=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:1px solid var(--line)"><span>${esc(r)}</span><span class="num">${n}</span></div>`).join(""):'<div class="mm" style="color:var(--muted)">No requests logged in the last 30 days.</div>'}
      </div>
    </div>
@@ -2591,6 +2923,7 @@ RENDER.support=function(){
      ${DB.support.slice(0,15).map(s=>`<tr><td>${fmtDateShort(s.date)} · ${s.time}</td><td><b>${esc(s.studentName)}</b></td><td>${esc(s.teacher)}</td><td>${esc(s.reason)}</td><td>${esc(s.responder)}</td><td>${esc(s.outcome)}</td></tr>`).join("")}
      </tbody></table></div></div>`;
   drawLine("supTrend",weeks.map(w=>w.label),weeks.map(w=>w.count),"Requests");
+  if(topReasons.length)drawHBar("supReasons",topReasons.map(r=>r[0]),topReasons.map(r=>r[1]),"Calls");
 };
 function avgResponse(){
   const times=DB.support.filter(s=>s.arrived&&s.time).map(s=>{const a=s.arrived.split(":").map(Number),b=s.time.split(":").map(Number);return (a[0]*60+a[1])-(b[0]*60+b[1]);}).filter(x=>x>0&&x<60);
@@ -2621,6 +2954,29 @@ RENDER.monthly=function(){
      <div class="stat red"><div class="rail"></div><div class="k">Class removals</div><div class="v">${inc.filter(i=>i.removedFromClass).length}</div><div class="d">${inc.filter(i=>i.removedFromClass&&i.parentContactStatus!=="called").length} family call${inc.filter(i=>i.removedFromClass&&i.parentContactStatus!=="called").length===1?"":"s"} still open</div></div>
    </div>
    <div class="card card-pad" style="margin-bottom:16px"><h3 style="font-size:15px;margin-bottom:12px">Daily incident trend</h3><canvas id="mTrend" height="90"></canvas></div>
+   ${(()=>{
+     const sup=DB.support.filter(x=>x.date>=daysAgo(30));
+     const by={};sup.forEach(x=>{const r=x.reason||"Not specified";by[r]=(by[r]||0)+1;});
+     const top=Object.entries(by).sort((a,b)=>b[1]-a[1]).slice(0,8);
+     const lost=totalMinutesOut(inc);
+     return `<div class="card card-pad" style="margin-bottom:16px;border-left:4px solid var(--teal)">
+       <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px">
+         <h3 style="font-size:15px">Why teachers called the Behavior Team</h3>
+         <span style="font-size:12px;color:var(--muted)">${sup.length} call${sup.length===1?"":"s"} in 30 days</span></div>
+       <p style="color:var(--muted);font-size:12.5px;margin:4px 0 14px">The most frequent reasons show where coaching or a classroom change would help most.</p>
+       ${top.length?`<canvas id="mReasons" height="${Math.max(150,top.length*34)}"></canvas>`:`<div class="empty" style="padding:22px">No support calls logged in this period.</div>`}
+     </div>
+     <div class="card card-pad" style="margin-bottom:16px;border-left:4px solid var(--orange)">
+       <h3 style="font-size:15px;margin-bottom:4px">Learning time lost to removals</h3>
+       <p style="color:var(--muted);font-size:12.5px;margin:0 0 14px">From the time a student left class to the time the Behavior Team sent them back.</p>
+       <div class="grid g-4">
+         <div class="stat red"><div class="rail"></div><div class="k">Total time out</div><div class="v" style="font-size:25px">${fmtMins(lost.total)}</div></div>
+         <div class="stat amber"><div class="rail"></div><div class="k">Average per removal</div><div class="v" style="font-size:25px">${fmtMins(lost.avg)}</div></div>
+         <div class="stat"><div class="rail"></div><div class="k">Removals measured</div><div class="v">${lost.counted}</div></div>
+         <div class="stat ${lost.open?"amber":"green"}"><div class="rail"></div><div class="k">No return time</div><div class="v">${lost.open}</div>
+           <div class="d">${lost.open?"not yet marked back":"all accounted for"}</div></div>
+       </div>
+     </div>`;})()}
    <div class="grid g-2" style="margin-bottom:16px">
      <div class="card card-pad"><h3 style="font-size:15px;margin-bottom:12px">Incidents by grade</h3><canvas id="mGrade" height="150"></canvas></div>
      <div class="card card-pad"><h3 style="font-size:15px;margin-bottom:12px">By time of day</h3><canvas id="mTime" height="150"></canvas></div>
@@ -2637,6 +2993,12 @@ RENDER.monthly=function(){
      </div>
    </div>`;
   drawLine("mTrend",days.map(d=>fmtDateShort(d.d)),days.map(d=>d.n),"Incidents",true);
+  (function(){
+    const sup=DB.support.filter(x=>x.date>=daysAgo(30));
+    const by={};sup.forEach(x=>{const r=x.reason||"Not specified";by[r]=(by[r]||0)+1;});
+    const top=Object.entries(by).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    if(top.length)drawHBar("mReasons",top.map(t=>t[0]),top.map(t=>t[1]),"Support calls");
+  })();
   drawBar("mGrade",Object.keys(byGrade),Object.values(byGrade),"Incidents");
   drawBar("mTime",timeOrder,timeOrder.map(t=>byTime[t]||0),"Incidents",["#8ec7bd","#4fb3a2","#0d7d6e","#e2952a","#e8721c"]);
   $$("#view-monthly [data-name]").forEach(r=>r.onclick=()=>{const s=DB.students.find(x=>x.name===r.dataset.name);if(s)openStudent(s.id);});
@@ -3028,13 +3390,95 @@ function addTeacher(){
 }
 
 /* ---- soft-remove (leadership) ---- */
-async function removeStudent(id){
-  const s=DB.students.find(x=>x.id===id);if(!s)return;
+function removeStudent(id){
+  const st=DB.students.find(x=>x.id===id);if(!st)return;
   const n=studentIncidents(id).length;
-  if(!confirm(`Remove ${s.name} from the active roster?\n\n${n} logged incident${n===1?"":"s"} will stay in the record and in past reports. You can re-add the student later.`))return;
-  await updateRecord("students",id,{active:false});
-  DB.students=DB.students.filter(x=>x.id!==id);
-  toast(s.name+" removed from roster");RENDER[activeView]&&RENDER[activeView]();renderNav();
+  const c=studentConsequences(id).length;
+  const t=DB.tracker.filter(e=>e.student===id&&!e.voided).length;
+  modal(`
+   <div class="modal-head"><h3>Remove ${esc(st.name)}</h3><button class="x" onclick="closeModal()">×</button></div>
+   <div class="modal-body">
+     <p style="font-size:13.5px;margin:0 0 15px">Grade ${esc(st.grade||"—")} · ${esc(st.teacher||"Unassigned")} · ID ${esc(st.id)}</p>
+     <div class="grid g-3" style="margin-bottom:17px">
+       <div class="stat"><div class="rail"></div><div class="k">Incidents</div><div class="v">${n}</div></div>
+       <div class="stat"><div class="rail"></div><div class="k">Interventions</div><div class="v">${c}</div></div>
+       <div class="stat"><div class="rail"></div><div class="k">Tardy/uniform</div><div class="v">${t}</div></div>
+     </div>
+     <div class="rm-opt" id="rmArchive">
+       <div class="rm-head">${svg('M21 8v13H3V8M1 3h22v5H1zM10 12h4')}<b>Take off the active roster</b><span class="pill teal">Recommended</span></div>
+       <p>They disappear from Quick Entry, the tracker and every list, but all ${n+c+t} records stay intact and keep appearing in past reports. Right choice for a student who transferred or withdrew — add them back later with the same ID and the history reconnects.</p>
+     </div>
+     <div class="rm-opt danger" id="rmDelete">
+       <div class="rm-head">${svg('M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6')}<b>Delete permanently</b><span class="pill s4">Cannot be undone</span></div>
+       <p>Erases the student and all ${n+c+t} linked records for good. Only for a duplicate or a test entry — never a real student with a history.</p>
+     </div>
+   </div>
+   <div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button></div>`);
+  $("#rmArchive").onclick=async()=>{
+    closeModal();
+    await updateRecord("students",id,{active:false});
+    DB.students=DB.students.filter(x=>x.id!==id);
+    toast(st.name+" taken off the active roster");
+    RENDER[activeView]&&RENDER[activeView]();renderNav();
+  };
+  $("#rmDelete").onclick=()=>confirmDelete(st,n+c+t);
+}
+function confirmDelete(st,total){
+  modal(`
+   <div class="modal-head" style="background:linear-gradient(100deg,#7a1410,#d6392f);color:#fff;border-bottom:0">
+     <h3 style="color:#fff">Delete ${esc(st.name)} permanently?</h3>
+     <button class="x" onclick="closeModal()" style="background:rgba(255,255,255,.22);color:#fff">×</button></div>
+   <div class="modal-body">
+     <div class="advise" style="margin:0 0 15px">
+       <div class="advise-head">${svg('M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z')} This cannot be undone</div>
+       <p>You are about to erase <b>${esc(st.name)}</b> and <b>${total} linked record${total===1?"":"s"}</b>. They disappear from every report including past months, and from the next nightly backup.</p>
+       <p style="margin:0">If this is a real student who left, close this and choose <b>Take off the active roster</b> instead.</p>
+     </div>
+     <div class="field"><label>Type DELETE to confirm</label>
+       <input type="text" id="delWord" placeholder="DELETE" autocomplete="off" style="width:100%;border:1.5px solid var(--line-strong);border-radius:10px;padding:11px 13px;font-size:15px"/></div>
+   </div>
+   <div class="modal-foot"><button class="btn" onclick="removeStudent('${st.id}')">Back</button>
+     <button class="btn danger" id="delGo" disabled style="border-color:var(--red);color:var(--red)">Delete permanently</button></div>`);
+  const w=$("#delWord"), b=$("#delGo");
+  w.oninput=()=>{ if(w.value.trim().toUpperCase()==="DELETE")b.removeAttribute("disabled"); else b.setAttribute("disabled",""); };
+  b.onclick=async()=>{
+    closeModal();
+    let hardDeleted=true;
+    if(CLOUD){
+      const res=await sb.from("students").delete().eq("id",st.id).select();
+      if(res.error||!res.data||!res.data.length){
+        hardDeleted=false;
+        await updateRecord("students",st.id,{active:false});
+      }
+    }
+    DB.students=DB.students.filter(x=>x.id!==st.id);
+    if(hardDeleted){
+      DB.incidents=DB.incidents.filter(x=>x.student!==st.id);
+      DB.consequences=DB.consequences.filter(x=>x.student!==st.id);
+      DB.support=DB.support.filter(x=>x.student!==st.id);
+      DB.tracker=DB.tracker.filter(x=>x.student!==st.id);
+      DB.flags=DB.flags.filter(x=>x.student!==st.id);
+    }
+    save();
+    RENDER[activeView]&&RENDER[activeView]();renderNav();renderAlerts();
+    if(hardDeleted){ toast(st.name+" permanently deleted"); }
+    else { deleteBlockedNotice(st); }
+  };
+  setTimeout(()=>{const el=$("#delWord");if(el)el.focus();},80);
+}
+/* The database blocks hard deletes until a one-time policy is added.
+   Say so plainly rather than pretending it worked. */
+function deleteBlockedNotice(st){
+  modal(`
+   <div class="modal-head"><h3>Archived instead of deleted</h3><button class="x" onclick="closeModal()">×</button></div>
+   <div class="modal-body">
+     <p style="font-size:13.5px;line-height:1.6;margin:0 0 14px"><b>${esc(st.name)}</b> has been taken off the active roster and is gone from every screen. Their rows are still in the database, because permanent deletion is switched off there by default.</p>
+     <p style="font-size:13.5px;line-height:1.6;margin:0 0 10px">To enable it, run this once in Supabase → SQL Editor. It is the only database change this update needs, and it is optional:</p>
+     <pre style="background:var(--ink);color:#cfe0dd;padding:13px 15px;border-radius:9px;font-size:11.5px;overflow-x:auto;line-height:1.55">create policy "portal delete students"
+  on public.students for delete using (true);</pre>
+     <p style="font-size:12px;color:var(--muted);margin:12px 0 0">Until then, archiving does the job for every normal case — a student who transferred or withdrew.</p>
+   </div>
+   <div class="modal-foot"><button class="btn primary" onclick="closeModal()">Understood</button></div>`);
 }
 async function removeTeacher(id){
   const t=DB.teachers.find(x=>x.id===id);if(!t)return;
@@ -3070,7 +3514,7 @@ RENDER.roster=function(){
    </div>
    <div class="card"><div style="overflow-x:auto">${rosterTab==="students"?studentTable(studs):teacherTable(teachers)}</div></div>`;
   $$("#rosterSeg button").forEach(b=>b.onclick=()=>{rosterTab=b.dataset.t;RENDER.roster();});
-  const q=$("#rq");if(q)q.oninput=e=>{rosterQ=e.target.value;RENDER.roster();$("#rq").focus();};
+  wireSearch("rq",v=>{rosterQ=v;},()=>RENDER.roster());
   $("#rosterAdd").onclick=()=>rosterTab==="students"?addStudent("",()=>RENDER.roster()):addTeacher();
   $$("#view-roster [data-rm-student]").forEach(b=>b.onclick=()=>removeStudent(b.dataset.rmStudent));
   $$("#view-roster [data-rm-teacher]").forEach(b=>b.onclick=()=>removeTeacher(b.dataset.rmTeacher));
@@ -3113,6 +3557,15 @@ function drawBar(id,labels,data,label,colors){
 function drawLine(id,labels,data,label,fill){
   const cv=$("#"+id);if(!cv||!window.Chart)return;if(charts[id])charts[id].destroy();
   charts[id]=new Chart(cv,{type:"line",data:{labels,datasets:[{label,data,borderColor:"#0d7d6e",backgroundColor:"rgba(13,125,110,.12)",fill:!!fill,tension:.35,pointRadius:labels.length>15?0:3,pointBackgroundColor:"#0d7d6e",borderWidth:2}]},options:baseOpts()});
+}
+function drawHBar(id,labels,data,label){
+  const cv=$("#"+id);if(!cv||!window.Chart)return;if(charts[id])charts[id].destroy();
+  const max=Math.max.apply(null,data);
+  charts[id]=new Chart(cv,{type:"bar",data:{labels:labels,datasets:[{label:label,data:data,
+    backgroundColor:data.map(v=>v===max?"#0d7d6e":"#4fb3a2"),borderRadius:6,maxBarThickness:26}]},
+    options:{indexAxis:"y",responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{beginAtZero:true,ticks:{precision:0,color:"#7b8c90",font:{family:"Inter",size:11}},grid:{color:"#eef2f1"}},
+              y:{grid:{display:false},ticks:{color:"#3f5257",font:{family:"Inter",size:12}}}}}});
 }
 function drawDoughnut(id,labels,data,colors){
   const cv=$("#"+id);if(!cv||!window.Chart)return;if(charts[id])charts[id].destroy();
@@ -3188,7 +3641,7 @@ async function boot(){
 boot();
 
 window.closeModal=closeModal;window.go=go;window.openStudent=openStudent;window.addConsequenceFor=addConsequenceFor;
-window.printStudent=printStudent;window.resetData=resetData;window.signOut=signOut;
+window.printStudent=printStudent;window.studentReport=studentReport;window.sendBackPrompt=sendBackPrompt;window.outNowModal=outNowModal;window.confirmDelete=confirmDelete;window.resetData=resetData;window.signOut=signOut;
 window.addStudent=addStudent;window.quickAddStudent=quickAddStudent;window.addTeacher=addTeacher;
 window.suspensionLetter=suspensionLetter;window.connectionCheck=connectionCheck;window.backupInfo=backupInfo;window.flushOutbox=flushOutbox;window.logTracker=logTracker;window.voidTracker=voidTracker;window.requestFunFridayFlag=requestFunFridayFlag;window.fullBackup=fullBackup;window.connectionCheck=connectionCheck;window.backupInfo=backupInfo;window.flushOutbox=flushOutbox;window.logTracker=logTracker;window.voidTracker=voidTracker;window.requestFunFridayFlag=requestFunFridayFlag;window.fullBackup=fullBackup;window.removalsModal=removalsModal;window.pendingCallsModal=pendingCallsModal;window.renderAlerts=renderAlerts;window.applyRole=applyRole;
 </script>
